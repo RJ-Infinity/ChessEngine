@@ -1,0 +1,159 @@
+:root{
+	--primary-colour-light: rgb(81, 80, 77);
+	--primary-colour-dark: rgb(45,45,45);
+	--secondary-colour-light: rgb(110, 68, 255);
+	--secondary-colour-dark: rgb(72, 39, 192);
+}
+
+html{
+	height: 100%;
+}
+body{
+	display: grid;
+	grid-template-columns: 2.5em 1fr;
+	grid-template-rows: min-content 1fr auto;
+	min-height: 100%;
+	margin: 0;
+	padding: 0;
+	font-family: sans-serif;
+	background-color: var(--primary-colour-light);
+}
+footer{
+	margin-top: auto;
+	background-color: var(--primary-colour-dark);
+	color: white;
+	padding: 1em;
+	grid-column-start: 1;
+	grid-column-end: 3;
+}
+footer a:visited{
+	color:#8608fb;
+}
+footer p{
+	margin: 0;
+}
+nav{
+	width: 2.5em;
+	height: 100%;
+	grid-row-start: 1;
+	grid-row-end: 3;
+	display: flex;
+	flex-direction: column;
+	background-color: var(--primary-colour-dark);
+	z-index: 10;
+	color: white;
+	gap: 0.5em;
+}
+nav *{
+	color: inherit;
+}
+nav svg{
+	width: 2em;
+	height: 2em;
+	fill: white;
+}
+nav span{
+	text-align: center;
+	margin-left: 0.25em;
+}
+nav a{
+	display: flex;
+	align-items: center;
+	text-decoration: none;
+	padding: 0.25em;
+}
+nav a:focus,
+nav a:hover{
+	background-color: rgba(0, 0, 0, 0.5);
+	outline: none;
+}
+nav:not(:hover,:focus-within) span{
+	display: none;
+}
+nav:where(:hover,:focus-within){
+	width: max-content;
+}
+main{
+	height: max-content;
+	color: aliceblue;
+	padding: 1em;
+}
+header h1{
+	font-size: 2em;
+	margin: 0;
+}
+header{
+	height: min-content;
+	background-color: var(--secondary-colour-light);
+}
+
+a.btn,
+button{
+	text-decoration: none;
+	margin: 0.5em;
+	padding: 0.5em;
+	background-color: aliceblue;
+	color: black;
+	display: inline-flex;
+	align-items: center;
+	border: none;
+}
+a.btn > svg,
+a.btn > img,
+button > svg,
+button > img{
+	height:1em;
+}
+
+input{
+	margin: 0.5em;
+	padding: calc(0.5em - 2px);
+	border: 2px solid black;
+	background-color: aliceblue;
+}
+
+input[type="range"] {
+	-webkit-appearance: none;
+}
+
+input[type="range"]::-webkit-slider-runnable-track{
+	background: var(--primary-colour-dark);
+	height: 0.25rem;
+	border-radius: 0.25rem;
+}/* these have to be duplicated as otherwise they dont work */
+input[type="range"]::-moz-range-track{
+	background: var(--primary-colour-dark);
+	height: 0.25rem;
+	border-radius: 0.25rem;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	appearance: none;
+
+}
+input[type="range"]::-webkit-slider-thumb{
+	width: 23px;
+	height: 23px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--secondary-colour-light);
+	cursor: pointer;
+
+	/* webkit only */
+	transform: translateY(calc(-50% + 0.125rem));
+}
+input[type="range"]::-moz-range-thumb{
+	width: 23px;
+	height: 23px;
+	border: 0;
+	border-radius: 50%;
+	background: var(--secondary-colour-light);
+	cursor: pointer;
+}
+
+input[type="checkbox"]{
+	height: fit-content;
+	height: calc(1em + 15px);
+	width: calc(1em + 15px);
+}

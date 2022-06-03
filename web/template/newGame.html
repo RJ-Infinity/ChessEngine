@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{%block title%}New Game{%endblock%}
+{%block head%}
+	<script src="static/ChessBoard.min.js"></script>
+	<style>
+		chess-board-{
+			display: block;
+		}
+		main{
+			display: grid;
+			grid-template-columns: 2fr 1fr;
+			gap: 1em;
+			height: max-content;
+		}
+		.setting::before{
+			content: attr(name);
+			grid-column: 1 / span 2;
+		}
+		.setting{
+			display: grid;
+			height: min-content;
+			width: 100%;
+		}
+		.board-size{
+			grid-template-columns: 1fr 10ch;
+		}
+		.disabled-sqr{
+			grid-template-columns: max-content 1fr;
+		}
+	</style>
+{%endblock%}
+{%block main%}
+	<chess-board- id="ChessBoard"></chess-board->
+	<div class="settings">
+		<div class="setting board-size" name="Board Size">
+			<input type="range" min="3" max="30" value="8" id="chessBoardWidthSlider">
+			<input type="number" min="1" value="8" id="chessBoardWidth">
+		</div>
+		<div class="setting disabled-sqr" name="Disabled Squares">
+			<input type="checkbox" id="disablePieces">
+			<input type="text" id="disabledPieces">
+		</div>
+	</div>
+	<script>
+		var chessBoard = document.getElementById("ChessBoard");
+
+		
+		var chessBoardWidthSlider = document.getElementById("chessBoardWidthSlider");
+		var chessBoardWidth = document.getElementById("chessBoardWidth");
+		chessBoardWidthSlider.value = 8;
+		chessBoardWidth.value = 8;
+		const chessBoardWidthInput = e=>{
+			chessBoardWidth.value = e.target.value;
+			chessBoardWidthSlider.value = e.target.value;
+			chessBoard.setAttribute("size",e.target.value);
+			chessBoard.refreshBoard();
+		}
+		chessBoardWidthSlider.addEventListener("input",chessBoardWidthInput);
+		chessBoardWidth.addEventListener("input",chessBoardWidthInput);
+
+		var disabledPieces = document.getElementById("disabledPieces");
+		disabledPieces.value = "";
+		var disablePieces = document.getElementById("disablePieces");
+		var disablePiecesEventHandler = e => {
+			chessBoard.setAttribute("disabled",e.target.value);
+			chessBoard.refreshBoard();
+		}
+		disabledPieces.addEventListener("input",disablePiecesEventHandler);
+		chessBoard.addEventListener("chessclick",(e)=>{
+			if(disablePieces.checked){
+				console.log([...chessBoard.disabled.map(el=>chessBoard.toCoord(el)), e.detail.pos].join(" "));
+			}
+		})
+		
+	</script>
+{%endblock%}
