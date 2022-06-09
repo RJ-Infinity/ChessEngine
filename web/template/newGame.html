@@ -5,12 +5,35 @@
 	<style>
 		chess-board-{
 			display: block;
+			position: sticky;
+			top: 1em;
+			aspect-ratio: 1 / 1;
 		}
 		main{
 			display: grid;
 			grid-template-columns: 2fr 1fr;
 			gap: 1em;
 			height: max-content;
+			width: 100%;
+			box-sizing: border-box;
+		}
+		@media screen and (max-width:650px) {
+			body{
+				height: 100%;
+			}
+			main{
+				grid-template-columns: 1fr;
+				height: 100%;
+				min-height: 0;
+			}
+			chess-board-{
+				position: relative;
+				top: auto;
+			}
+			.settings{
+				min-height: 0;
+				overflow: auto;
+			}
 		}
 		.setting::before{
 			content: attr(name);
@@ -20,6 +43,7 @@
 			display: grid;
 			height: min-content;
 			width: 100%;
+			margin-bottom: 2em;
 		}
 		.board-size{
 			grid-template-columns: 1fr 10ch;

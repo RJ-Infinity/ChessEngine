@@ -17,6 +17,7 @@ body{
 	padding: 0;
 	font-family: sans-serif;
 	background-color: var(--primary-colour-light);
+	width: 100%;
 }
 footer{
 	margin-top: auto;
@@ -25,6 +26,7 @@ footer{
 	padding: 1em;
 	grid-column-start: 1;
 	grid-column-end: 3;
+	z-index: 10;
 }
 footer a:visited{
 	color:#8608fb;
@@ -43,6 +45,15 @@ nav{
 	z-index: 10;
 	color: white;
 	gap: 0.5em;
+}
+nav>div{
+	position: sticky;
+	top: 0;
+}
+@media (hover: hover) {
+	nav #open{
+		display: none;
+	}
 }
 nav *{
 	color: inherit;
@@ -98,6 +109,10 @@ button{
 	align-items: center;
 	border: none;
 }
+a.btn:hover,
+button:hover{
+	filter: brightness(85%);
+}
 a.btn > svg,
 a.btn > img,
 button > svg,
@@ -114,6 +129,7 @@ input{
 
 input[type="range"] {
 	-webkit-appearance: none;
+	min-width: 0;
 }
 
 input[type="range"]::-webkit-slider-runnable-track{
@@ -127,11 +143,6 @@ input[type="range"]::-moz-range-track{
 	border-radius: 0.25rem;
 }
 
-input[type="range"]::-webkit-slider-thumb {
-	-webkit-appearance: none;
-	appearance: none;
-
-}
 input[type="range"]::-webkit-slider-thumb{
 	width: 23px;
 	height: 23px;
@@ -142,6 +153,14 @@ input[type="range"]::-webkit-slider-thumb{
 
 	/* webkit only */
 	transform: translateY(calc(-50% + 0.125rem));
+	-webkit-appearance: none;
+	appearance: none;
+}
+input[type="range"]:hover::-webkit-slider-thumb{
+	filter: brightness(85%);
+}
+input[type="range"]:hover::-moz-range-thumb{
+	filter: brightness(85%);
 }
 input[type="range"]::-moz-range-thumb{
 	width: 23px;
