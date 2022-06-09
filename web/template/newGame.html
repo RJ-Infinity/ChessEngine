@@ -63,6 +63,7 @@
 		<div class="setting disabled-sqr" name="Disabled Squares">
 			<input type="checkbox" id="disablePieces">
 			<input type="text" id="disabledPieces">
+			<button id="removeBtn">Toggle selected pieces</button>
 		</div>
 	</div>
 	<script>
@@ -71,8 +72,10 @@
 		
 		var chessBoardWidthSlider = document.getElementById("chessBoardWidthSlider");
 		var chessBoardWidth = document.getElementById("chessBoardWidth");
+
 		chessBoardWidthSlider.value = 8;
 		chessBoardWidth.value = 8;
+
 		const chessBoardWidthInput = e=>{
 			chessBoardWidth.value = e.target.value;
 			chessBoardWidthSlider.value = e.target.value;
@@ -82,19 +85,64 @@
 		chessBoardWidthSlider.addEventListener("input",chessBoardWidthInput);
 		chessBoardWidth.addEventListener("input",chessBoardWidthInput);
 
+
+
 		var disabledPieces = document.getElementById("disabledPieces");
-		disabledPieces.value = "";
 		var disablePieces = document.getElementById("disablePieces");
-		var disablePiecesEventHandler = e => {
-			chessBoard.setAttribute("disabled",e.target.value);
-			chessBoard.refreshBoard();
+		var removeBtn = document.getElementById("removeBtn");
+
+		disabledPieces.value = "";
+		disablePieces.checked = false;
+		var chessDisabledPieces = []
+		
+		disabledPieces.addEventListener("input",e => {
+			chessDisabledPieces = e.target.value.split(" ").filter(el=>el!=="");
+			highlightDisabledPieces();
+		});
+		const highlightDisabledPieces = ()=>{
+			disabledPieces.parentNode.classList.remove("error");
+			for (let i = 0; i < chessBoard.size; i++) {
+				for (let j = 0; j < chessBoard.size; j++) {
+					chessBoard.highlightPiece(chessBoard.toCoord({x:i,y:j}),"red",true);
+				}
+			}
+			chessDisabledPieces.forEach(el => {
+				try{
+					if (!chessBoard.disabled.includes(chessBoard.toIndex(el))){
+						chessBoard.highlightPiece(el,"red")
+					}
+				}catch (error){
+					disabledPieces.parentElement.classList.add("error")
+				}
+			});
+			chessBoard.disabled.forEach(el => {
+				if (!chessDisabledPieces.includes(chessBoard.toCoord(el))){
+					try{
+						chessBoard.highlightPiece(chessBoard.toCoord(el),"red")
+					}catch (error){
+						disabledPieces.parentElement.classList.add("error")
+					}
+				}
+			})
 		}
-		disabledPieces.addEventListener("input",disablePiecesEventHandler);
-		chessBoard.addEventListener("chessclick",(e)=>{
+		chessBoard.addEventListener("chessrefreshed",highlightDisabledPieces);
+		chessBoard.addEventListener("chessclick",e=>{
 			if(disablePieces.checked){
-				console.log([...chessBoard.disabled.map(el=>chessBoard.toCoord(el)), e.detail.pos].join(" "));
+				if (chessDisabledPieces.includes(e.detail.pos)){
+					disabledPieces.value = chessDisabledPieces.filter(el=>e.detail.pos!==el).join(" ");
+				}else{
+					disabledPieces.value = [...chessDisabledPieces, e.detail.pos].join(" ");
+				}
+				chessDisabledPieces = disabledPieces.value.split(" ").filter(el=>el!=="")
+				highlightDisabledPieces();
 			}
 		})
+		removeBtn.addEventListener("click",e=>{
+			if (!disabledPieces.parentElement.classList.contains("error")){
+				chessBoard.setAttribute("disabled",disabledPieces.value);
+				chessBoard.refreshBoard();
+			}
+		});
 		
 	</script>
 {%endblock%}
