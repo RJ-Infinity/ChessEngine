@@ -12,6 +12,9 @@ def newGame():
 @server.route("/joinGame")
 def joinGame():
 	return render_template("joinGame.html")
+@server.route("/settings")
+def settings():
+	return render_template("settings.html")
 
 if __name__ == "__main__":
 	server.run(debug=True)

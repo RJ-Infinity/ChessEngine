@@ -1,8 +1,12 @@
 :root{
-	--primary-colour-light: rgb(81, 80, 77);
-	--primary-colour-dark: rgb(45,45,45);
-	--secondary-colour-light: rgb(110, 68, 255);
-	--secondary-colour-dark: rgb(72, 39, 192);
+	--primary-colour-light-values: 81, 80, 77;
+	--primary-colour-dark-values: 45,45,45;
+	--secondary-colour-light-values: 110, 68, 255;
+	--secondary-colour-dark-values: 72, 39, 192;
+	--primary-colour-light: rgb(var(--primary-colour-light-values));
+	--primary-colour-dark: rgb(var(--primary-colour-dark-values));
+	--secondary-colour-light: rgb(var(--secondary-colour-light-values));
+	--secondary-colour-dark: rgb(var(--secondary-colour-dark-values));
 }
 
 html{
@@ -120,7 +124,7 @@ button > img{
 	height:1em;
 }
 
-input{
+input,textarea{
 	margin: 0.5em;
 	padding: calc(0.5em - 2px);
 	border: 2px solid black;
@@ -175,4 +179,10 @@ input[type="checkbox"]{
 	height: fit-content;
 	height: calc(1em + 15px);
 	width: calc(1em + 15px);
+}
+
+textarea {
+	white-space: pre;
+	overflow-wrap: normal;
+	resize: none;
 }
