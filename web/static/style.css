@@ -7,6 +7,9 @@
 	--primary-colour-dark: rgb(var(--primary-colour-dark-values));
 	--secondary-colour-light: rgb(var(--secondary-colour-light-values));
 	--secondary-colour-dark: rgb(var(--secondary-colour-dark-values));
+
+	accent-color: var(--secondary-colour-light);
+	caret-color: var(--secondary-colour-light);
 }
 
 html{
@@ -58,6 +61,13 @@ nav>div{
 	nav #open{
 		display: none;
 	}
+}
+nav #skipBtn:not(:focus){
+	height: 0;
+	padding: 0;
+}
+nav #skipBtn:not(:focus) *{
+	display: none;
 }
 nav *{
 	color: inherit;
@@ -185,4 +195,7 @@ textarea {
 	white-space: pre;
 	overflow-wrap: normal;
 	resize: none;
+}
+[type=monaco-wrapper]>[type=monaco] .cursor.monaco-mouse-cursor-text{
+	background-color: var(--secondary-colour-light);
 }

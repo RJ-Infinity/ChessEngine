@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {%block title%}New Game{%endblock%}
 {%block head%}
-	<script src="static/ChessBoard.min.js"></script>
+	<script src="/static/ChessBoard.min.js"></script>
+	<link rel="stylesheet" data-name="vs/editor/editor.main" href="/static/monaco/min/vs/editor/editor.main.css">
 	<style>
 		chess-board-{
 			display: block;
@@ -11,6 +12,7 @@
 			max-width: calc(100vh - 2em);
 			width: 100%;
 			justify-self: center;
+			border-radius: 2%;
 		}
 		main{
 			display: grid;
@@ -195,6 +197,93 @@
 		#expand:checked ~ .expand-cover::after{
 			transform: translateX(-15%) rotate(45deg);
 		}
+		.json{
+			grid-template-columns: 1fr;
+		}
+		.json>div{
+			max-height: 100%;
+			height: 20em;
+			border: 2px solid black;
+			margin: 0 1em;
+			height: 400px;
+			position: relative;
+		}
+		.start-btn{
+			font-size: 1.25em;
+			width: calc(100% - 2em);
+			box-sizing: content-box;
+			justify-content: center;
+		}
+		#jsonMoacoFullCheck{
+			opacity: 0;
+			position:absolute;
+			pointer-events: none;
+		}
+		label[for=jsonMoacoFullCheck]{
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 1.5em;
+			height: 1.5em;
+			z-index: 5;
+			background-color: var(--secondary-colour-light);
+			border-bottom-right-radius: 0.2em;
+			accent-color: var(--secondary-colour-dark);
+		}
+		label[for=jsonMoacoFullCheck]>.min{
+			display: none;
+		}
+		#jsonMoacoFullCheck:focus-visible + div label[for=jsonMoacoFullCheck]{
+			outline: 2px solid var(--secondary-colour-dark);
+		}
+		#jsonMoacoFullCheck:checked + div label[for=jsonMoacoFullCheck]>.min{
+			display: block;
+		}
+		#jsonMoacoFullCheck:checked + div label[for=jsonMoacoFullCheck]>.full{
+			display: none;
+		}
+		#jsonMoacoFullCheck:not(:checked) + div{
+			width: calc(100% - 2em - 4px);
+			animation: fix-width 1ms;
+		}
+		@keyframes fix-width {
+			0%,100%{
+				width: 1px;
+			}
+		}
+		#jsonMoacoFullCheck:checked + div{
+			position: fixed;
+			top: 0;
+			left: 0;
+			z-index: 20;
+			margin: 0;
+			border: none;
+			height: 100vh;
+			width: calc(100vw - 20px);
+			min-width: calc(100vw - 20px);
+		}
+		@supports selector(A:has(B)){
+			#jsonMoacoFullCheck:checked + div{
+				width: 100vw;
+				min-width: 100vw;
+			}
+			body:has(> main #jsonMoacoFullCheck:checked){
+				overflow: hidden;
+			}
+		}
+		[type=monaco-wrapper]{
+			position: relative;
+		}
+		[type=monaco-wrapper]>[type=monaco]{
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+		}
+		#escapeJsonMonaco:focus-visible{
+			/* outline: none; */
+			bottom: 0;
 		}
 	</style>
 {%endblock%}
@@ -256,11 +345,80 @@
 			<input type="text" id="disabledPieces">
 			<button id="removeBtn">Toggle selected pieces</button>
 		</div>
+		<div class="setting json" name="JSON Settings">
+			<input type="checkbox" id="jsonMoacoFullCheck">
+			<div type="monaco-wrapper">
+				<div type="monaco" lan="json" value="{}">
+					<label for="jsonMoacoFullCheck">
+						<svg class="full" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M6 42V27H9V36.9L36.9 9H27V6H42V21H39V11.1L11.1 39H21V42Z"/></svg>
+						<svg class="min" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M6.1 44 4 41.9 18.9 27H9V24H24V39H21V29.1ZM24 24V9H27V18.9L41.9 4L44 6.1L29.1 21H39V24Z"/></svg>
+					</label>
+				</div>
+				<div id="escapeJsonMonaco" tabindex="0"></div>
+			</div>
+		</div>
 	</div>
+	<script>var require = { paths: { 'vs': 'static/monaco/min/vs' } };</script>
+
+	<script src="static/monaco/min/vs/loader.js"></script>
+	<script src="static/monaco/min/vs/editor/editor.main.nls.js"></script>
+	<script src="static/monaco/min/vs/editor/editor.main.js"></script>
+
 	<script>
+		window.monacoEditors = {
+			getEditor : (el)=>monacoEditors.editors.filter((ed)=>ed._domElement === el)[0],
+			getElement : (ed)=>ed._domElement,
+			add : (ed)=>monacoEditors.editors.push(ed),
+			editors : [],
+		}
+		document.querySelectorAll("div[type=monaco]").forEach(el=>{
+			window.monacoEditors.add(monaco.editor.create(el, {
+				value: el.getAttribute("value") || "",
+				language: el.getAttribute("lan"),
+				renderWhitespace: "all",
+				bracketPairColorization: {enabled:true},
+				colorDecorators: true,
+				dragAndDrop:true,
+				// overflowWidgetsDomNode: el.parentElement,
+				fixedOverflowWidgets:true,
+				useShadowDOM:true,
+			}));
+
+			new ResizeObserver((e)=>{
+				if(e[0].target===undefined)return
+				// console.log(e[0])
+				window.monacoEditors.getEditor(e[0].target).layout();
+			}).observe(el)
+		})
+	</script>
+	<script>
+		function updateatr(json,att,val){
+			json[att]=val;
+			return json;
+		}
+		function upadteEditor(editor,att,val){
+			try{
+				json = JSON.parse(monacoEditors.getEditor(editor).getValue());
+			}catch{
+				json = {};
+			}
+			monacoEditors.getEditor(editor).getModel().setValue(
+				JSON.stringify(
+					updateatr(
+						json,
+						att,
+						val
+					),
+					null,
+					"\t"
+				)
+			);
+		}
+
 		var chessBoard = document.getElementById("ChessBoard");
 
-		
+		var monacoJsonContainer = document.querySelector(".setting.json div[type=monaco][lan=json]");
+
 		var chessBoardWidthSlider = document.getElementById("chessBoardWidthSlider");
 		var chessBoardWidth = document.getElementById("chessBoardWidth");
 
@@ -272,11 +430,21 @@
 			chessBoardWidthSlider.value = e.target.value;
 			chessBoard.setAttribute("size",e.target.value);
 			chessBoard.refreshBoard();
+			upadteEditor(monacoJsonContainer,"size",e.target.value);
 		}
 		chessBoardWidthSlider.addEventListener("input",chessBoardWidthInput);
 		chessBoardWidth.addEventListener("input",chessBoardWidthInput);
 
-
+		monacoJsonContainer.addEventListener("keydown",e=>{
+			if (e.key == "Escape"){
+				if(e.shiftKey){
+					document.getElementById("jsonMoacoFullCheck").focus();
+				}else{
+					console.log(document.getElementById("escapeJsonMonaco"))
+					document.getElementById("escapeJsonMonaco").focus();
+				}
+			}
+		});
 
 		var disabledPieces = document.getElementById("disabledPieces");
 		var disablePieces = document.getElementById("disablePieces");
@@ -332,6 +500,7 @@
 			if (!disabledPieces.parentElement.classList.contains("error")){
 				chessBoard.setAttribute("disabled",disabledPieces.value);
 				chessBoard.refreshBoard();
+				upadteEditor(monacoJsonContainer,"disabled",disabledPieces.value);
 			}
 		});
 		
