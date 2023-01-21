@@ -5,4 +5,4 @@ pyvenv.cfg
 web/static/ChessBoard.min.js
 web/static/monaco/*
 bot/
-__pychache__
+__pycache__
