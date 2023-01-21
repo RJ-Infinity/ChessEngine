@@ -1,0 +1,169 @@
+// chess piece definition file
+<@knight
+	moves=[
+		pos-board.width-2,
+		pos-board.width*2-1,
+		pos-board.width*2+1,
+		pos-board.width+2,
+		pos+board.width-2,
+		pos+board.width*2-1,
+		pos+board.width*2+1,
+		pos+board.width-2
+	]
+	value=3
+>
+<@king
+	moves=[
+		pos+1,
+		pos-1,
+		pos-board.width,
+		pos-board.width+1,
+		pos-board.width-1,
+		pos+board.width,
+		pos+board.width+1,
+		pos+board.width-1
+	]
+	checkable=true
+	events=($checkmate{colour.loose()})
+	value=0
+>
+<@pawn
+	moves=[
+		pos+colour.direction:{board.getPiece(£move)==null},
+		pos+colour.direction*2:{
+			moveCount==0 &&
+			board.getPiece(pos+colour.direction)==null &&
+			board.getPiece(£move)==null &&
+		},
+		pos+colour.direction+1:{board.getPiece(£move)!=null},
+		pos+colour.direction-1:{board.getPiece(£move)!=null},
+		pos+colour.direction+1:{
+			// there is no need for a check for an empty square as this must be the case
+			// for the other pawn to move 
+			board.getPiece(pos+1)=="pawn" &&
+			board.getPiece(pos+1).colour!=colour &&
+			board.getPiece(pos+1).lastmove==board.getPiece(pos+1).colour.lastmove &&
+			board.getPiece(pos+1).lastmove.distance==board.getPiece(pos+1).colour.direction*2
+		}${board.takePiece(pos+1)},
+		pos+colour.direction-1:{
+			board.getPiece(pos-1)=="pawn" &&
+			board.getPiece(pos+1).colour!=colour &&
+			board.getPiece(pos-1).lastmove==board.getPiece(pos-1).colour.lastmove &&
+			board.getPiece(pos-1).lastmove.distance==board.getPiece(pos-1).colour.direction*2
+		}${board.takePiece(pos-1)},
+	]
+	events=($move:{pos.index.primaryAxis}{
+		board.removePiece(pos);
+		board.setPeice(pos,openSelectPeice(),colour)
+	})
+	value=1
+>
+<@rook
+	moves=(
+		(
+			(i)(pos)Σ(pos-(pos%board.width)+1)//between pos and the leftmost but one square on that row
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-1}:{
+				£i>=pos-(pos%board.width) &&
+				board.getPiece(£i-1).colour!=colour
+			}
+		)+
+		(
+			(i)(pos)Σ(pos-(pos%board.width)+board.width-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+1}:{
+				£i<pos-(pos-(pos%board.width)+board.width) &&
+				board.getPiece(£i+1).colour!=colour
+			}
+		)+
+		(
+			(i→(pos+£i*board.width))(0)Σ((board.length-board.width+(pos%board.width)-pos)/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width}:{board.getPiece(£i+board.width).colour!=colour}
+			//no bounds needed as it will just go out of bounds not overflow
+		)+
+		(
+			(i→(pos-£i*board.width))(0)Σ((pos-(pos%board.width))/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width}:{board.getPiece(£i-board.width).colour!=colour}
+		)
+	)
+	value=5
+>
+<@bishop
+	moves=(
+		(//top right
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width+1}:{board.getPiece(£i+board.width+1).colour!=colour}
+		)+
+		(//top left
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width-1}:{board.getPiece(£i+board.width-1).colour!=colour}
+		)+
+		(//bottom right
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width+1}:{board.getPiece(£i-board.width+1).colour!=colour}
+		)+
+		(//bottom left
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width-1}:{board.getPiece(£i-board.width-1).colour!=colour}
+		)
+	)
+	value=3
+>
+<@queen
+	moves=(
+		(//rook moves
+			(i)(pos)Σ(pos-(pos%board.width)+1)//between pos and the leftmost but one square on that row
+			:{board.getPiece(£i)==null||board.getPiece(£i)==self}
+			{£i-1}:{
+				£i>=pos-(pos%board.width) &&
+				board.getPiece(£i-1).colour!=colour
+			}
+		)+
+		(
+			(i)(pos)Σ(pos-(pos%board.width)+board.width-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+1}:{
+				£i<pos-(pos-(pos%board.width)+board.width) &&
+				board.getPiece(£i+1).colour!=colour
+			}
+		)+
+		(
+			(i→(pos+£i*board.width))(0)Σ((board.length-board.width+(pos%board.width)-pos)/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width}:{board.getPiece(£i+board.width).colour!=colour}
+			//no bounds needed as it will just go out of bounds not overflow
+		)+
+		(
+			(i→(pos-£i*board.width))(0)Σ((pos-(pos%board.width))/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width}:{board.getPiece(£i-board.width).colour!=colour}
+		)+
+		(//bishop moves
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width+1}:{board.getPiece(£i+board.width+1).colour!=colour}
+		)+
+		(
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width-1}:{board.getPiece(£i+board.width-1).colour!=colour}
+		)+
+		(
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width+1}:{board.getPiece(£i-board.width+1).colour!=colour}
+		)+
+		(
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width-1}:{board.getPiece(£i-board.width-1).colour!=colour}
+		)
+	)
+	value=9
+>
