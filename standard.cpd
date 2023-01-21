@@ -72,7 +72,7 @@
 			(i)(pos)Σ(pos-(pos%board.width)+board.width-2)
 			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
 			{£i+1}:{
-				£i<pos-(pos-(pos%board.width)+board.width) &&
+				£i<<pos-(pos-(pos%board.width)+board.width) &&
 				board.getPiece(£i+1).colour!=colour
 			}
 		)+
@@ -129,7 +129,7 @@
 			(i)(pos)Σ(pos-(pos%board.width)+board.width-2)
 			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
 			{£i+1}:{
-				£i<pos-(pos-(pos%board.width)+board.width) &&
+				£i<<pos-(pos-(pos%board.width)+board.width) &&
 				board.getPiece(£i+1).colour!=colour
 			}
 		)+
