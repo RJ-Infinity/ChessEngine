@@ -4,3 +4,5 @@ Scripts/
 pyvenv.cfg
 web/static/ChessBoard.min.js
 web/static/monaco/*
+bot/
+__pychache__
