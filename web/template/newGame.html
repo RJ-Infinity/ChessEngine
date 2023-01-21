@@ -358,6 +358,9 @@
 			</div>
 		</div>
 	</div>
+	<dialog id="ErrorDialog">
+		
+	</dialog>
 	<script>var require = { paths: { 'vs': 'static/monaco/min/vs' } };</script>
 
 	<script src="static/monaco/min/vs/loader.js"></script>
@@ -414,6 +417,43 @@
 				)
 			);
 		}
+
+		var ErrorModal = document.getElementById("ErrorDialog");
+		ErrorModal.addEventListener("click",e=>{
+			rect = e.target.getBoundingClientRect();
+			if (
+				e.clientX < rect.left ||
+				e.clientX > rect.right ||
+				e.clientY < rect.top ||
+				e.clientY > rect.bottom
+			){
+				e.target.close();
+			}
+		})
+		var goBtn = document.getElementById("StartGame");
+		goBtn.addEventListener("click",()=>{
+			let xhr = new XMLHttpRequest();
+			xhr.open("POST", "/createGame");
+			
+			xhr.setRequestHeader("Accept", "application/json");
+			xhr.setRequestHeader("Content-Type", "application/json");
+
+			xhr.onload = () => {
+				console.log(xhr.responseText)
+				data = JSON.parse(xhr.responseText);
+				if ("error" in data){
+					ErrorModal.textContent = "ERROR: " + data["error"];
+					ErrorModal.showModal();
+					return;
+				}
+				window.location.href = `/Game/${data.pin}`
+			}
+
+			// console.log(monacoEditors.getEditor(monacoJsonContainer).getValue())
+
+			xhr.send(monacoEditors.getEditor(monacoJsonContainer).getValue());
+		});
+
 
 		var chessBoard = document.getElementById("ChessBoard");
 
@@ -504,5 +544,8 @@
 			}
 		});
 		
+		monacoEditors.getEditor(monacoJsonContainer).getModel().onDidChangeContent((event) => {
+			// console.log(event)
+		});
 	</script>
 {%endblock%}

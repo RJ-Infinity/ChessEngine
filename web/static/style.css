@@ -1,4 +1,5 @@
-:root{
+:root,
+::backdrop{
 	--primary-colour-light-values: 81, 80, 77;
 	--primary-colour-dark-values: 45,45,45;
 	--secondary-colour-light-values: 110, 68, 255;
@@ -106,6 +107,7 @@ main{
 header h1{
 	font-size: 2em;
 	margin: 0;
+	padding-left: 1ch;
 }
 header{
 	height: min-content;
@@ -198,4 +200,17 @@ textarea {
 }
 [type=monaco-wrapper]>[type=monaco] .cursor.monaco-mouse-cursor-text{
 	background-color: var(--secondary-colour-light);
+}
+
+dialog h2{
+	margin: 0;
+}
+dialog{
+	border-radius: 0.5em;
+	border-width: 2px;
+}
+dialog::backdrop{
+	background-color: var(--primary-colour-light);
+	opacity: 0.8;
+	backdrop-filter: blur(4px);
 }

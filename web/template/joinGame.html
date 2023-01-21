@@ -14,10 +14,16 @@
 {%block main%}
 	<h2>Join A Game</h2>
 	<div class="join-box">
-		<input type="text">
-		<button>
+		<input id="JoinPin" type="text">
+		<button id="JoinButton">
 			<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><path d="M 31.3 24 L 21.3 14 L 19.2 16.1 L 25.6 22.5 H 4.05 V 25.5 H 25.6 L 19.2 31.9 L 21.3 34 Z M 44 24 Q 44 19.85 42.425 16.2 Q 40.85 12.55 38.15 9.85 Q 35.45 7.15 31.8 5.575 Q 28.15 4 24 4 Q 17.25 4 11.75 8.125 Q 6.25 12.25 4.5 19.5 H 7.7 Q 9.3 13.75 13.825 10.375 Q 18.35 7 24 7 Q 31 7 36 12 Q 41 17 41 24 Q 41 31 36 36 Q 31 41 24 41 Q 18.35 41 13.825 37.625 Q 9.3 34.25 7.7 28.5 H 4.5 Q 6.25 35.75 11.75 39.875 Q 17.25 44 24 44 Q 28.15 44 31.8 42.425 Q 35.45 40.85 38.15 38.15 Q 40.85 35.45 42.425 31.8 Q 44 28.15 44 24 Z"/></svg>
 			<span>Join Game</span>
 		</button>
 	</div>
+	<script>
+		pinInput = document.getElementById("JoinPin");
+		pinInput.addEventListener("keydown",e=>{if (event.key == "Enter"){Join();}});
+		function Join(){window.location.href = `/Game/${pinInput.value}`}
+		document.getElementById("JoinButton").addEventListener("click",Join);
+	</script>
 {%endblock%}
