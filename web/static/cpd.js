@@ -8,6 +8,7 @@ const numbers = ["1","2","3","4","5","6","7","8","9","0"];
 const letters = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
 const allValidChars = exprChars.concat(whiteSpaceChars).concat(numbers).concat(letters);
 export class CPD{
+	// TODO: Add indicies suport exponent
 	Data = null;
 	Tokens = null;
 	TypeTokens = null;
@@ -216,6 +217,57 @@ export class CPD{
 			throw "Parser Error: "+message+" at "+this.prettyPrintPos(pos)
 		}}
 		this.SyntaxTree=[];
+		const joinUnaryOp=(token, index, type, tokenRepr, validTypes, allowedTypes)=>{
+			assert(
+				validTypes.includes(token.args[index+1].type),
+				`can only use a '${tokenRepr}' on a ${allowedTypes}`,
+				token.args[index].pos
+			);
+			token.args[index] = {
+				type:type,
+				pos:token.args[index].pos,
+				recurse:true,
+				args:token.args[index+1]
+			};
+			token.args.splice(index+1, 1);
+		}
+		const joinBinaryOps=(
+			token,
+			type,
+			tokenType,
+			tokenRepr,
+			validTypes,
+			allowedTypes,
+			tryUnary=false
+		)=>{
+			var index = token.args.findIndex(token=>token.type==tokenType);
+			while (token.args[index]!==undefined){
+				if (index===0){
+					assert(
+						tryUnary,
+						`there must be a value before a '${tokenRepr}'`,
+						token.args[index].pos
+					);
+					joinUnaryOp(token, index, type, tokenRepr, validTypes, allowedTypes)
+				}else{
+					assert(
+						validTypes.includes(token.args[index-1].type) ||
+						validTypes.includes(token.args[index+1].type),
+						`can only use a '${tokenRepr}' on a ${allowedTypes}`,
+						token.args[index].pos
+					);
+					token.args[index-1] = {
+						type:type,
+						pos:token.args[index-1].pos,
+						recurse:true,
+						args:[token.args[index-1],token.args[index+1]]
+					};
+					token.args.splice(index, 2);
+				}
+				index = token.args.findIndex(token=>token.type==tokenType);
+			}
+
+		}
 		const ParseArgs=(token)=>{
 			var treeRoot = {};
 			if (!token.recurse){return token;}
@@ -253,13 +305,51 @@ export class CPD{
 				);
 				//remove the "."
 				token.args.splice(index, 1);
-				//as the index used to point to the "." it now points to the next value
-				// which is added to the list
-				token.args[index-1].args.push(token.args[index].args);
-				//the next value is also removed
-				token.args.splice(index, 1);
+				//add the next part
+				token.args[index-1].args.push(token.args.splice(index, 1)[0].args);
 				index = token.args.findIndex(token=>token.type=="seperator");
 			}
+			// bidmas
+			// brackets are allready handled
+			// indicies dont yet exist
+			// division
+			joinBinaryOps(
+				token,
+				"division",
+				"div",
+				"/",
+				["property","text","Statement","division"],
+				"text node or statement"
+			);
+			// multiplication
+			joinBinaryOps(
+				token,
+				"multiplication",
+				"mul",
+				"*",
+				["property","text","Statement","division","multiplication"],
+				"text node or statement"
+			);
+			// addition
+			joinBinaryOps(
+				token,
+				"addition",
+				"add",
+				"+",
+				["property","text","Statement","division","multiplication","addition","List"],
+				"text node, statement or List",
+				true
+			);
+			// subtraction
+			joinBinaryOps(
+				token,
+				"subtraction",
+				"sub",
+				"-",
+				["property","text","Statement","division","multiplication","addition","subtraction","List"],
+				"text node, statement or List",
+				true
+			);
 			index = 0;
 			if (token.type==="OuterDefPiece"){
 				assert(token.args[index]?.type === "text","piece definition has no name",token.pos);
@@ -278,6 +368,9 @@ export class CPD{
 					treeRoot.properties.push({type:"namedProperty",key:name.args,value:ParseArgs(token.args[index])});
 					index++;
 				}
+			}
+			if (token.type==="OuterDef"){
+				treeRoot.args=token.args;
 			}
 			return treeRoot;
 		}
