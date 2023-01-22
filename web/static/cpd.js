@@ -2,12 +2,16 @@ const doubleChars = ["&","|","=","<",">"];
 const equalTypes = ["!","<",">"];
 const exprChars = [
 	"@","<",">","-","[","]","$","£","+",".","*","{","}","(",")",":","/",",","!","\"","%","Σ","→","=",";"
-].concat(doubleChars);
+].concat(doubleChars).concat(equalTypes);
 const whiteSpaceChars = [" ","\t","\n"];
+const numbers = ["1","2","3","4","5","6","7","8","9","0"];
+const letters = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
+const allValidChars = exprChars.concat(whiteSpaceChars).concat(numbers).concat(letters);
 export class CPD{
 	Data = null;
 	Tokens = null;
 	TypeTokens = null;
+	SyntaxTree = null;
 	Filename;
 	constructor(filename){
 		this.Filename = filename;
@@ -16,6 +20,15 @@ export class CPD{
 		if(this.Data === null){
 			throw "Lexer Error: no data, Data must be added before lexing can start";
 		}
+		var index = this.Data.indexOf("σ");
+		if (index!==-1){
+			var lines = this.Data.substring(0,index).split("\n")
+			throw `Lexer Error: invalid char 'σ' at ${this.prettyPrintPos({
+				line:lines.length,
+				char:lines.at(-1).length+1
+			})}`;
+		}
+		this.Data = this.Data.toLowerCase().replaceAll("σ","Σ");
 		this.Tokens = [];
 		var line = 1;
 		var character = 0;
@@ -30,6 +43,9 @@ export class CPD{
 		};
 		this.Data.split("").forEach(char => {
 			character++;
+			if (!allValidChars.includes(char)){
+				throw `Lexer Error: invalid char '${char}' at ${this.prettyPrintPos({line:line,char:character})}`;
+			}
 			if (char == "\n"){
 				line++;
 				character = 0;
@@ -95,31 +111,31 @@ export class CPD{
 			}
 		});
 	}
-	Parser(){
+	Tokeniser(){
 		if(this.Tokens === null){
-			throw "Parser Error: no tokens, Tokens must be added or generated before parsing can start";
+			throw "Tokeniser Error: no tokens, Tokens must be added or generated before tokenising can start";
 		}
+		const assert=(expr,message,pos)=>{if (!expr){
+			throw "Tokeniser Error: "+message+" at "+this.prettyPrintPos(pos)
+		}}
 		this.TypeTokens={args:[]};
 		var currTT=this.TypeTokens;
-		const assert=(expr,message,pos)=>{if (!expr){
-			console.log(this.TypeTokens);
-			throw "Parser Error: "+message+" at "+this.prettyPrintPos(pos)
-		}}
 		const addToken=(name,pos)=>{
 			pushToken(name,pos);
 			currTT=currTT.args.at(-1);
+			currTT.recurse = true;
 		}
 		const pushToken=(name,pos)=>{
-			currTT.args.push({type:name,args:[],parent:currTT,pos:pos});
+			currTT.args.push({type:name,args:[],parent:currTT,pos:pos,recurse:false});
 		}
 		const closeToken=(expr,message,pos)=>{
 			assert(expr,message,pos);
 			currTT=currTT.parent;
 		}
-		var peiceRefState="";
+		var pieceRefState="";
 		this.Tokens.forEach(token=>{
-			if (peiceRefState!==""){
-				switch (peiceRefState){
+			if (pieceRefState!==""){
+				switch (pieceRefState){
 					case "open":{
 						currTT.args.push({
 							type:"text",
@@ -127,15 +143,15 @@ export class CPD{
 							parent:currTT,
 							pos:token.pos
 						});
-						peiceRefState = "full";
+						pieceRefState = "full";
 					}break;
 					case "full":{
 						closeToken(
 							token.content==="\"",
-							"only one token alowed in a Peice Reference",
+							"only one token alowed in a Piece Reference",
 							token.pos
 						);
-						peiceRefState = "";
+						pieceRefState = "";
 					}
 				}
 				return;
@@ -143,7 +159,7 @@ export class CPD{
 			switch (token.content) {
 				case "@":{
 					assert(currTT.type==="OuterDef","'@' must be the first token in a 'OuterDef'",token.pos);
-					currTT.type="OuterDefPeice";
+					currTT.type+="Piece";
 				}break;
 				case "<":{addToken("OuterDef",token.pos);}break;
 				case ">":{closeToken(currTT.type.startsWith("OuterDef"),"unmatched '>'",token.pos);}break;
@@ -164,8 +180,8 @@ export class CPD{
 				case ",":{pushToken("sep",token.pos);}break;
 				case "!":{pushToken("inv",token.pos);}break;
 				case "\"":{
-					addToken("PeiceRef",token.pos);
-					peiceRefState="open";
+					addToken("PieceRef",token.pos);
+					pieceRefState="open";
 				}break;
 				case "%":{pushToken("mod",token.pos);}break;
 				case "Σ":{pushToken("sum",token.pos);}break;
@@ -182,7 +198,6 @@ export class CPD{
 				case ">=":{pushToken("geq",token.pos);}break;
 
 				default:{
-					console.log(token.content)
 					currTT.args.push({
 						type:"text",
 						args:token.content,
@@ -192,9 +207,85 @@ export class CPD{
 				}break;
 			}
 		});
-		
 	}
-	prettyPrintPos=pos=>`${this.Filename}:${pos.line},${pos.char}`
+	Parser(){
+		if(this.TypeTokens === null){
+			throw "Parser Error: no type tokens, TypeTokens must be added or generated before parsing can start";
+		}
+		const assert=(expr,message,pos)=>{if (!expr){
+			throw "Parser Error: "+message+" at "+this.prettyPrintPos(pos)
+		}}
+		this.SyntaxTree=[];
+		const ParseArgs=(token)=>{
+			var treeRoot = {};
+			if (!token.recurse){return token;}
+			treeRoot.type=token.type;
+			treeRoot.pos=token.pos;
+			var index = token.args.findIndex(token=>token.type=="seperator");
+			while (token.args[index]!==undefined){
+				assert(
+					index>0,
+					"there must be a property before a '.'",
+					token.args[index].pos
+				);
+				assert(
+					token.args[index-1].type==="text"||token.args[index-1].type==="property",
+					"can only use a '.' on a text node",
+					token.args[index].pos
+				);
+				if (token.args[index-1].type==="text"){
+					token.args[index-1] = {
+						type:"property",
+						pos:token.args[index-1].pos,
+						recurse:false,
+						args:[token.args[index-1].args]
+					}
+				}
+				assert(
+					token.args[index-1].type==="property",
+					"FATAL UNREACHABLE near",
+					token.args[index-1].pos||token.args[index].pos
+				);
+				assert(
+					token.args[index+1].type==="text",
+					"can only use a '.' on a text node",
+					token.args[index+1].pos
+				);
+				//remove the "."
+				token.args.splice(index, 1);
+				//as the index used to point to the "." it now points to the next value
+				// which is added to the list
+				token.args[index-1].args.push(token.args[index].args);
+				//the next value is also removed
+				token.args.splice(index, 1);
+				index = token.args.findIndex(token=>token.type=="seperator");
+			}
+			index = 0;
+			if (token.type==="OuterDefPiece"){
+				assert(token.args[index]?.type === "text","piece definition has no name",token.pos);
+				treeRoot.name = token.args[index].args;
+				treeRoot.type = "PieceDefinition"
+				treeRoot.properties = [];
+				index++;
+				var name;
+				while (token.args[index] !== undefined){
+					name = token.args[index];
+					assert(name.type==="text","named property key must be a text Node",name.pos);
+					index++;
+					assert(token.args[index]?.type==="set","named property name must be followed by '='",token.args[index]?.pos||token.args[index-1].pos);
+					index++;
+					assert(token.args[index] !== undefined,"named property must have a value",token.args[index-1].pos);
+					treeRoot.properties.push({type:"namedProperty",key:name.args,value:ParseArgs(token.args[index])});
+					index++;
+				}
+			}
+			return treeRoot;
+		}
+		this.TypeTokens.args.forEach(
+			token=>this.SyntaxTree.push(ParseArgs(token))
+		);
+	}
+	prettyPrintPos=pos=>`${this.Filename}:${pos.line}:${pos.char}`
 }
 
 window.CPD = CPD;
