@@ -167,36 +167,36 @@ export class CPD{
 				case "-":{pushToken("sub",token.pos);}break;
 				case "[":{addToken("List",token.pos);}break;
 				case "]":{closeToken(currTT.type=="List","unmatched ']'",token.pos);}break;
-				case "$":{pushToken("event",token.pos);}break;
+				/*TODO*/case "$":{pushToken("event",token.pos);}break;
 				case "£":{pushToken("var",token.pos);}break;
 				case "+":{pushToken("add",token.pos);}break;
 				case ".":{pushToken("seperator",token.pos);}break;
 				case "*":{pushToken("mul",token.pos);}break;
-				case "{":{addToken("Expresion",token.pos);}break;
-				case "}":{closeToken(currTT.type=="Expresion","unmatched '}'",token.pos);}break;
+				/*TODO*/case "{":{addToken("Expresion",token.pos);}break;
+				/*TODO*/case "}":{closeToken(currTT.type=="Expresion","unmatched '}'",token.pos);}break;
 				case "(":{addToken("Statement",token.pos);}break;
 				case ")":{closeToken(currTT.type=="Statement","unmatched ')'",token.pos);}break;
 				case ":":{pushToken("condition",token.pos);}break;
 				case "/":{pushToken("div",token.pos);}break;
 				case ",":{pushToken("sep",token.pos);}break;
-				case "!":{pushToken("inv",token.pos);}break;
-				case "\"":{
+				/*TODO*/case "!":{pushToken("inv",token.pos);}break;
+				/*TODO*/case "\"":{
 					addToken("PieceRef",token.pos);
 					pieceRefState="open";
 				}break;
 				case "%":{pushToken("mod",token.pos);}break;
-				case "Σ":{pushToken("sum",token.pos);}break;
-				case "→":{pushToken("map",token.pos);}break;
+				/*TODO*/case "Σ":{pushToken("sum",token.pos);}break;
+				/*TODO*/case "→":{pushToken("map",token.pos);}break;
 				case "=":{pushToken("set",token.pos);}break;
-				case ";":{pushToken("ins",token.pos);}break;
-				case "&&":{pushToken("and",token.pos);}break;
-				case "||":{pushToken("or",token.pos);}break;
-				case "==":{pushToken("eq",token.pos);}break;
-				case "<<":{pushToken("lt",token.pos);}break;
-				case ">>":{pushToken("gt",token.pos);}break;
-				case "!=":{pushToken("neq",token.pos);}break;
-				case "<=":{pushToken("leq",token.pos);}break;
-				case ">=":{pushToken("geq",token.pos);}break;
+				/*TODO*/case ";":{pushToken("ins",token.pos);}break;
+				/*TODO*/case "&&":{pushToken("and",token.pos);}break;
+				/*TODO*/case "||":{pushToken("or",token.pos);}break;
+				/*TODO*/case "==":{pushToken("eq",token.pos);}break;
+				/*TODO*/case "<<":{pushToken("lt",token.pos);}break;
+				/*TODO*/case ">>":{pushToken("gt",token.pos);}break;
+				/*TODO*/case "!=":{pushToken("neq",token.pos);}break;
+				/*TODO*/case "<=":{pushToken("leq",token.pos);}break;
+				/*TODO*/case ">=":{pushToken("geq",token.pos);}break;
 
 				default:{
 					currTT.args.push({
@@ -279,6 +279,21 @@ export class CPD{
 			var treeRoot = {};
 			treeRoot.type=token.type;
 			treeRoot.pos=token.pos;
+			// split text into number and str
+			token.args = token.args.map(token=>{
+				if (token.type !== "text"){return token;}
+				if (token.args.split("").map(c=>letters.includes(c)?"":c).join("").length>0){
+					if (token.args.split("").map(c=>numbers.includes(c)?"":c).join("").length>0){
+						assert(false,"text can only contain letters or numbers",token.pos);
+					}else{
+						token.type = "int";
+						return token;
+					}
+				}else{
+					token.type = "str";
+					return token;
+				}
+			});
 			// conditionalExpr
 			joinUnaryOps(token,"condExpr","condition",":",["Expresion"],"expresion");
 			token
@@ -295,11 +310,11 @@ export class CPD{
 					token.args[index].pos
 				);
 				assert(
-					token.args[index-1].type==="text"||token.args[index-1].type==="property",
-					"can only use a '.' on a text node",
+					token.args[index-1].type==="str"||token.args[index-1].type==="property",
+					"can only use a '.' on a string node",
 					token.args[index].pos
 				);
-				if (token.args[index-1].type==="text"){
+				if (token.args[index-1].type==="str"){
 					token.args[index-1] = {
 						type:"property",
 						pos:token.args[index-1].pos,
@@ -313,8 +328,8 @@ export class CPD{
 					token.args[index-1].pos||token.args[index].pos
 				);
 				assert(
-					token.args[index+1].type==="text",
-					"can only use a '.' on a text node",
+					token.args[index+1].type==="str",
+					"can only use a '.' on a string node",
 					token.args[index+1].pos
 				);
 				//remove the "."
@@ -324,7 +339,7 @@ export class CPD{
 				index = token.args.findIndex(token=>token.type=="seperator");
 			}
 			// variables
-			joinUnaryOps(token,"variable","var","£",["property","text"],"property");
+			joinUnaryOps(token,"variable","var","£",["property","str"],"property");
 			// bidmas
 			// brackets are allready handled by tokeniser
 			// indicies dont yet exist
@@ -334,8 +349,8 @@ export class CPD{
 				"division",
 				"div",
 				"/",
-				["property","text","Statement","division"],
-				"text node or statement"
+				["property","str","int","Statement","division"],
+				"property, int or statement"
 			);
 			// multiplication
 			joinBinaryOps(
@@ -343,8 +358,17 @@ export class CPD{
 				"multiplication",
 				"mul",
 				"*",
-				["property","text","Statement","division","multiplication"],
-				"text node or statement"
+				["property","str","int","Statement","division","multiplication"],
+				"property, int or statement"
+			);
+			// modulus is like division
+			joinBinaryOps(
+				token,
+				"modulus",
+				"mod",
+				"%",
+				["property","str","int","Statement","division","multiplication","modulus"],
+				"property, int or statement"
 			);
 			// addition
 			joinBinaryOps(
@@ -352,8 +376,8 @@ export class CPD{
 				"addition",
 				"add",
 				"+",
-				["property","text","Statement","division","multiplication","addition","List"],
-				"text node, statement or List",
+				["property","str","int","Statement","division","multiplication","modulus","addition","List"],
+				"property, int, statement or List",
 				true
 			);
 			// subtraction
@@ -362,13 +386,13 @@ export class CPD{
 				"subtraction",
 				"sub",
 				"-",
-				["property","text","Statement","division","multiplication","addition","subtraction","List"],
-				"text node, statement or List",
+				["property","str","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
+				"property, int, statement or List",
 				true
 			);
 			index = 0;
 			if (token.type==="OuterDefPiece"){
-				assert(token.args[index]?.type === "text","piece definition has no name",token.pos);
+				assert(token.args[index]?.type === "str","piece definition has no name",token.pos);
 				treeRoot.name = token.args[index].args;
 				treeRoot.type = "PieceDefinition"
 				treeRoot.properties = [];
@@ -376,7 +400,7 @@ export class CPD{
 				var name;
 				while (token.args[index] !== undefined){
 					name = token.args[index];
-					assert(name.type==="text","named property key must be a text Node",name.pos);
+					assert(name.type==="str","named property key must be a text Node",name.pos);
 					index++;
 					assert(token.args[index]?.type==="set","named property name must be followed by '='",token.args[index]?.pos||token.args[index-1].pos);
 					index++;
@@ -384,6 +408,19 @@ export class CPD{
 					treeRoot.properties.push({type:"namedProperty",key:name.args,value:ParseArgs(token.args[index])});
 					index++;
 				}
+			}
+			if (token.type === "Statement"){
+				treeRoot.args=token.args.map(arg=>ParseArgs(arg));
+			}
+			if (token.type === "List"){
+				treeRoot.args=token.args.reduce((acc,arg)=>{
+					if(arg.type==="sep"){
+						acc.push([]);
+					}else{
+						acc.at(-1).push(ParseArgs(arg));
+					}
+					return acc;
+				},[[]]);
 			}
 			if (token.type==="OuterDef"){
 				treeRoot.args=token.args;
