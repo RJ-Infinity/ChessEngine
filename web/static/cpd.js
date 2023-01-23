@@ -231,6 +231,13 @@ export class CPD{
 			};
 			token.args.splice(index+1, 1);
 		}
+		const joinUnaryOps=(token, type, tokenType, tokenRepr, validTypes, allowedTypes)=>{
+			var index = token.args.findIndex(token=>token.type==tokenType);
+			while (token.args[index]!==undefined){
+				joinUnaryOp(token, index, type, tokenRepr, validTypes, allowedTypes);
+				index = token.args.findIndex(token=>token.type==tokenType);
+			}
+		}
 		const joinBinaryOps=(
 			token,
 			type,
@@ -266,13 +273,20 @@ export class CPD{
 				}
 				index = token.args.findIndex(token=>token.type==tokenType);
 			}
-
 		}
 		const ParseArgs=(token)=>{
-			var treeRoot = {};
 			if (!token.recurse){return token;}
+			var treeRoot = {};
 			treeRoot.type=token.type;
 			treeRoot.pos=token.pos;
+			// conditionalExpr
+			joinUnaryOps(token,"condExpr","condition",":",["Expresion"],"expresion");
+			token
+			.args
+			.map((t,i)=>t.type==="condExpr"?i:null)
+			.filter(i=>i!==null)
+			.forEach(i=>token.args[i].args=token.args[i].args.args);
+			// property
 			var index = token.args.findIndex(token=>token.type=="seperator");
 			while (token.args[index]!==undefined){
 				assert(
@@ -309,8 +323,10 @@ export class CPD{
 				token.args[index-1].args.push(token.args.splice(index, 1)[0].args);
 				index = token.args.findIndex(token=>token.type=="seperator");
 			}
+			// variables
+			joinUnaryOps(token,"variable","var","£",["property","text"],"property");
 			// bidmas
-			// brackets are allready handled
+			// brackets are allready handled by tokeniser
 			// indicies dont yet exist
 			// division
 			joinBinaryOps(
