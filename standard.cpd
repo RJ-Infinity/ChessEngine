@@ -54,7 +54,7 @@
 		pos+colour.direction*2:{
 			moveCount==0 &&
 			board.getPiece(pos+colour.direction)==null &&
-			board.getPiece(£move)==null &&
+			board.getPiece(£move)==null
 		},
 		pos+colour.direction+1:{board.getPiece(£move)!=null},
 		pos+colour.direction-1:{board.getPiece(£move)!=null},
@@ -73,7 +73,8 @@
 			board.getPiece(pos-1).lastmove.distance==board.getPiece(pos-1).colour.direction*2
 		}${board.takePiece(pos-1)},
 	]
-	events=($move:{pos.index.primaryAxis}{
+	//note division is integer only so these comparisons work
+	events=($move:{pos/board.width==0||pos/board.width==7}{
 		board.removePiece(pos);
 		board.setPiece(pos,openSelectPiece(),colour)
 	})
