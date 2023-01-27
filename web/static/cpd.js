@@ -181,7 +181,7 @@ export class CPD{
 				case "/":{pushToken("div",token.pos);}break;
 				case ",":{pushToken("sep",token.pos);}break;
 				/*TODO*/case "!":{pushToken("inv",token.pos);}break;
-				/*TODO*/case "\"":{
+				case "\"":{
 					addToken("PieceRef",token.pos);
 					pieceRefState="open";
 					currTT.recurse = false;
@@ -241,6 +241,38 @@ export class CPD{
 				index = token.args.findIndex(token=>token.type==tokenType);
 			}
 		}
+		const joinBinaryOp=(
+			token,
+			index,
+			type,
+			tokenRepr,
+			validTypes,
+			allowedTypes,
+			tryUnary
+		)=>{
+			if (index===0){
+				assert(
+					tryUnary,
+					`there must be a value before a '${tokenRepr}'`,
+					token.args[index].pos
+				);
+				joinUnaryOp(token, index, type, tokenRepr, validTypes, allowedTypes)
+			}else{
+				assert(
+					validTypes.includes(token.args[index-1].type) ||
+					validTypes.includes(token.args[index+1].type),
+					`can only use a '${tokenRepr}' on a ${allowedTypes}`,
+					token.args[index].pos
+				);
+				token.args[index-1] = {
+					type:type,
+					pos:token.args[index-1].pos,
+					recurse:false,
+					args:[ParseArgs(token.args[index-1]),ParseArgs(token.args[index+1])]
+				};
+				token.args.splice(index, 2);
+			}
+		}
 		const joinBinaryOps=(
 			token,
 			type,
@@ -252,28 +284,15 @@ export class CPD{
 		)=>{
 			var index = token.args.findIndex(token=>token.type==tokenType);
 			while (token.args[index]!==undefined){
-				if (index===0){
-					assert(
-						tryUnary,
-						`there must be a value before a '${tokenRepr}'`,
-						token.args[index].pos
-					);
-					joinUnaryOp(token, index, type, tokenRepr, validTypes, allowedTypes)
-				}else{
-					assert(
-						validTypes.includes(token.args[index-1].type) ||
-						validTypes.includes(token.args[index+1].type),
-						`can only use a '${tokenRepr}' on a ${allowedTypes}`,
-						token.args[index].pos
-					);
-					token.args[index-1] = {
-						type:type,
-						pos:token.args[index-1].pos,
-						recurse:false,
-						args:[ParseArgs(token.args[index-1]),ParseArgs(token.args[index+1])]
-					};
-					token.args.splice(index, 2);
-				}
+				joinBinaryOp(
+					token,
+					index,
+					type,
+					tokenRepr,
+					validTypes,
+					allowedTypes,
+					tryUnary
+				);
 				index = token.args.findIndex(token=>token.type==tokenType);
 			}
 		}
