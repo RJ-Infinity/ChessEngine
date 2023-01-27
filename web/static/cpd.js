@@ -142,7 +142,8 @@ export class CPD{
 							type:"text",
 							args:token.content,
 							parent:currTT,
-							pos:token.pos
+							pos:token.pos,
+							recurse:false
 						});
 						pieceRefState = "full";
 					}break;
@@ -183,6 +184,7 @@ export class CPD{
 				/*TODO*/case "\"":{
 					addToken("PieceRef",token.pos);
 					pieceRefState="open";
+					currTT.recurse = false;
 				}break;
 				case "%":{pushToken("mod",token.pos);}break;
 				/*TODO*/case "Σ":{pushToken("sum",token.pos);}break;
@@ -203,7 +205,8 @@ export class CPD{
 						type:"text",
 						args:token.content,
 						parent:currTT,
-						pos:token.pos
+						pos:token.pos,
+						recurse:false
 					});
 				}break;
 			}
@@ -226,7 +229,7 @@ export class CPD{
 			token.args[index] = {
 				type:type,
 				pos:token.args[index].pos,
-				recurse:true,
+				recurse:false,
 				args:token.args[index+1]
 			};
 			token.args.splice(index+1, 1);
@@ -266,8 +269,8 @@ export class CPD{
 					token.args[index-1] = {
 						type:type,
 						pos:token.args[index-1].pos,
-						recurse:true,
-						args:[token.args[index-1],token.args[index+1]]
+						recurse:false,
+						args:[ParseArgs(token.args[index-1]),ParseArgs(token.args[index+1])]
 					};
 					token.args.splice(index, 2);
 				}
@@ -279,6 +282,7 @@ export class CPD{
 			var treeRoot = {};
 			treeRoot.type=token.type;
 			treeRoot.pos=token.pos;
+			treeRoot.recurse=token.recurse;
 			// split text into number and str
 			token.args = token.args.map(token=>{
 				if (token.type !== "text"){return token;}
@@ -294,6 +298,26 @@ export class CPD{
 					return token;
 				}
 			});
+			// function call
+			var index = token.args.findIndex(
+				(t,i)=>t.type==="str" &&
+				token.args[i+1]?.type==="Statement"
+			);
+			while (token.args[index]!==undefined){
+				var functionStatement = ParseArgs(token.args[index+1]);
+				token.args[index] = {
+					type:"Function",
+					pos:token.args[index].pos,
+					recurse:false,
+					name:token.args[index].args,
+					args: functionStatement.args
+				};
+				token.args.splice(index+1, 1);
+				index = token.args.findIndex(
+					(t,i)=>t.type==="str" &&
+					token.args[i+1]?.type==="Statement"
+				);
+			}
 			// conditionalExpr
 			joinUnaryOps(token,"condExpr","condition",":",["Expresion"],"expresion");
 			token
@@ -301,8 +325,45 @@ export class CPD{
 			.map((t,i)=>t.type==="condExpr"?i:null)
 			.filter(i=>i!==null)
 			.forEach(i=>token.args[i].args=token.args[i].args.args);
+			token.args.filter(t=>t.type==="condExpr").forEach(t=>t.recurse = true);
+			token.args = token.args.map(t=>t.type==="condExpr"?ParseArgs(t):t);
+			// event
+			index = token.args.findIndex(token=>token.type=="event");
+			while (token.args[index]!==undefined){
+				if (token.args[index+1].type==="str"){
+					token.args[index] = {
+						type: "namedEvent",
+						name: token.args.splice(index+1, 1)[0],
+						pos:token.args[index].pos,
+						recurse:false
+					};
+					if (token.args[index+1].type == "condExpr"){
+						token.args[index].conditionalExpresion = ParseArgs(token.args.splice(index+1, 1)[0]);
+					}
+					assert(
+						token.args[index+1].type == "Expresion",
+						"A named event must be followed by an optional conditional expresion then an expresion block",
+						token.args[index].pos
+					);
+					token.args[index].Expresion = ParseArgs(token.args.splice(index+1, 1)[0]);
+				}else{
+					assert(
+						token.args[index+1].type==="Expresion",
+						"can only use a '$' on a string or expression",
+						token.args[index].pos
+					);
+					token.args[index] = {
+						type:"implicitEvent",
+						pos:token.args[index].pos,
+						recurse:false,
+						args:token.args[index+1]
+					};
+					token.args.splice(index+1, 1);
+				}
+				index = token.args.findIndex(token=>token.type=="event");
+			}
 			// property
-			var index = token.args.findIndex(token=>token.type=="seperator");
+			index = token.args.findIndex(token=>token.type=="seperator");
 			while (token.args[index]!==undefined){
 				assert(
 					index>0,
@@ -310,7 +371,9 @@ export class CPD{
 					token.args[index].pos
 				);
 				assert(
-					token.args[index-1].type==="str"||token.args[index-1].type==="property",
+					token.args[index-1].type==="str" ||
+					token.args[index-1].type==="property" ||
+					token.args[index-1].type==="Function",
 					"can only use a '.' on a string node",
 					token.args[index].pos
 				);
@@ -322,20 +385,37 @@ export class CPD{
 						args:[token.args[index-1].args]
 					}
 				}
+				if (token.args[index-1].type==="Function"){
+					token.args[index-1] = {
+						type:"property",
+						pos:token.args[index-1].pos,
+						recurse:false,
+						args:[token.args[index-1]]
+					}
+				}
 				assert(
 					token.args[index-1].type==="property",
 					"FATAL UNREACHABLE near",
 					token.args[index-1].pos||token.args[index].pos
 				);
+				// console.log(token.args)
+				// console.log(index)
 				assert(
-					token.args[index+1].type==="str",
+					token.args[index+1].type==="str" ||
+					token.args[index+1].type==="Function",
 					"can only use a '.' on a string node",
 					token.args[index+1].pos
 				);
 				//remove the "."
 				token.args.splice(index, 1);
 				//add the next part
-				token.args[index-1].args.push(token.args.splice(index, 1)[0].args);
+				if (token.args[index].type==="str"){
+					token.args[index-1].args.push(token.args.splice(index, 1)[0].args);
+				}else if (token.args[index].type==="Function"){
+					token.args[index-1].args.push(token.args.splice(index, 1)[0]);
+				}else{
+					assert(false,"FATAL UNREACHABLE near",token.args[index].pos||token.args[index-1].pos);
+				}
 				index = token.args.findIndex(token=>token.type=="seperator");
 			}
 			// variables
@@ -390,6 +470,14 @@ export class CPD{
 				"property, int, statement or List",
 				true
 			);
+
+
+
+			//↑↑↑↑↑↑↑↑↑↑↑↑↑↑ this is the parsing of the args
+			//↓↓↓↓↓↓↓↓↓↓↓↓↓↓ this is the creation of the treeRoot
+
+
+
 			index = 0;
 			if (token.type==="OuterDefPiece"){
 				assert(token.args[index]?.type === "str","piece definition has no name",token.pos);
@@ -409,7 +497,10 @@ export class CPD{
 					index++;
 				}
 			}
-			if (token.type === "Statement"){
+			if (
+				token.type === "Statement" ||
+				token.type === "condExpr"
+			){
 				treeRoot.args=token.args.map(arg=>ParseArgs(arg));
 			}
 			if (token.type === "List"){
