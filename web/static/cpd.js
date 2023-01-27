@@ -168,13 +168,13 @@ export class CPD{
 				case "-":{pushToken("sub",token.pos);}break;
 				case "[":{addToken("List",token.pos);}break;
 				case "]":{closeToken(currTT.type=="List","unmatched ']'",token.pos);}break;
-				/*TODO*/case "$":{pushToken("event",token.pos);}break;
+				case "$":{pushToken("event",token.pos);}break;
 				case "£":{pushToken("var",token.pos);}break;
 				case "+":{pushToken("add",token.pos);}break;
 				case ".":{pushToken("seperator",token.pos);}break;
 				case "*":{pushToken("mul",token.pos);}break;
-				/*TODO*/case "{":{addToken("Expresion",token.pos);}break;
-				/*TODO*/case "}":{closeToken(currTT.type=="Expresion","unmatched '}'",token.pos);}break;
+				case "{":{addToken("Expresion",token.pos);}break;
+				case "}":{closeToken(currTT.type=="Expresion","unmatched '}'",token.pos);}break;
 				case "(":{addToken("Statement",token.pos);}break;
 				case ")":{closeToken(currTT.type=="Statement","unmatched ')'",token.pos);}break;
 				case ":":{pushToken("condition",token.pos);}break;
@@ -283,20 +283,31 @@ export class CPD{
 			treeRoot.type=token.type;
 			treeRoot.pos=token.pos;
 			treeRoot.recurse=token.recurse;
+			// peiceref
+			token.args = token.args.map(t=>{
+				if (t.type !== "PeiceRef"){return t;}
+				assert(
+					t.args.length == 1 && t.args[0].type=="text",
+					"a peice ref must contain a single text node",
+					t.pos
+				);
+				t.args = t.args[0].args;
+				return t;
+			});
 			// split text into number and str
-			token.args = token.args.map(token=>{
-				if (token.type !== "text"){return token;}
-				if (token.args.split("").map(c=>letters.includes(c)?"":c).join("").length>0){
-					if (token.args.split("").map(c=>numbers.includes(c)?"":c).join("").length>0){
-						assert(false,"text can only contain letters or numbers",token.pos);
-					}else{
-						token.type = "int";
-						return token;
-					}
-				}else{
-					token.type = "str";
-					return token;
+			token.args = token.args.map(t=>{
+				if (t.type !== "text"){return t;}
+				if (t.args.split("").map(c=>letters.includes(c)?"":c).join("").length>0){
+					assert(
+						t.args.split("").map(c=>numbers.includes(c)?"":c).join("").length==0,
+						"text can only contain letters or numbers",
+						t.pos
+					);
+					t.type = "int";
+					return t;
 				}
+				t.type = "str";
+				return t;
 			});
 			// function call
 			var index = token.args.findIndex(
