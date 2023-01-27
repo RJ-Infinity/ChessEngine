@@ -21,7 +21,28 @@
 		pos-board.width-1,
 		pos+board.width,
 		pos+board.width+1,
-		pos+board.width-1
+		pos+board.width-1,
+		pos+2:{
+			board.getPiece(£move)==null &&
+			!board.isAttacked(£move-1) &&
+			!inCheck &&
+			moveCount==0 &&
+			board.getPiece(£move+1).moveCount==0 &&
+			board.getPiece(£move-1) == null
+		}${
+			board.getPiece(£move+1).moveTo(£move-1)
+		},
+		pos-2:{
+			board.getPiece(£move)==null &&
+			!board.isAttacked(£move+1) &&
+			!inCheck &&
+			moveCount==0 &&
+			board.getPiece(£move-2).moveCount==0 &&
+			board.getPiece(£move+1) == null &&
+			board.getPiece(£move-1) == null
+		}${
+			board.getPiece(£move-2).moveTo(£move+1)
+		}
 	]
 	checkable=true
 	events=($checkmate{colour.loose()})
@@ -54,7 +75,7 @@
 	]
 	events=($move:{pos.index.primaryAxis}{
 		board.removePiece(pos);
-		board.setPeice(pos,openSelectPeice(),colour)
+		board.setPiece(pos,openSelectPiece(),colour)
 	})
 	value=1
 >
