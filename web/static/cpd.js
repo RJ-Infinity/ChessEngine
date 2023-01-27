@@ -268,7 +268,7 @@ export class CPD{
 				joinUnaryOp(token, index, type, tokenRepr, validTypes, allowedTypes)
 			}else{
 				assert(
-					validTypes.includes(token.args[index-1].type) ||
+					validTypes.includes(token.args[index-1].type) &&
 					validTypes.includes(token.args[index+1].type),
 					`can only use a '${tokenRepr}' on a ${allowedTypes}`,
 					token.args[index].pos
@@ -463,6 +463,7 @@ export class CPD{
 			}
 			// variables
 			joinUnaryOps(token,"variable","var","£",["property","str"],"property");
+			joinUnaryOps(token,"inversion","inv","!",["variable","property","str"],"not");
 			// bidmas
 			// brackets are allready handled by tokeniser
 			// indicies dont yet exist
@@ -474,35 +475,58 @@ export class CPD{
 				"mul":["multiplication","*"],
 				"mod":["modulus","%"],
 			}
-			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			while (token.args[index]!==undefined){
-				joinBinaryOp(
-					token,
-					index,
-					oldNewMatch[token.args[index].type][0],
-					oldNewMatch[token.args[index].type][1],
-					["property","str","int","Statement","division","multiplication","modulus"],
-					"property, int or statement"
-				);
-				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			}
-			// addition
-			// subtraction
-			oldNewMatch = {
+			var oldNewMatchSecond = {
 				"add":["addition","+"],
 				"sub":["subtraction","-"]
 			}
 			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			var validTypes = ["property","str","variable","int","Statement","division","multiplication","modulus"];
+			while (token.args[index]!==undefined){
+				assert(
+					index===0,
+					`there must be a value before a '${oldNewMatch[token.args[index].type][1]}'`,
+					token.args[index].pos
+				);
+				// allow to operate on unary + or - i.e. (8*-9)
+				if (["add","sub"].includes(token.args[index+1]?.type)){
+					joinUnaryOp(
+						token,
+						index+1,
+						oldNewMatchSecond[token.args[index+1].type][0],
+						oldNewMatchSecond[token.args[index+1].type][1],
+						["property","str","variable","int","Statement","division","multiplication","modulus","addition","subtraction"],
+						"property, int, statement if proceded by a '"+oldNewMatch[token.args[index].type][1]+"'"
+					);
+				}
+				assert(
+					validTypes.includes(token.args[index-1].type) &&
+					validTypes.includes(token.args[index+1]?.type),
+					`can only use a '${oldNewMatch[token.args[index].type][1]}' on a property, int or statement`,
+					token.args[index].pos
+				);
+				token.args[index-1] = {
+					type:oldNewMatch[token.args[index].type][0],
+					pos:token.args[index-1].pos,
+					recurse:false,
+					args:[ParseArgs(token.args[index-1]),ParseArgs(token.args[index+1])]
+				};
+				token.args.splice(index, 2);
+				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			}
+			// addition
+			// subtraction
+			index = token.args.findIndex(token=>Object.keys(oldNewMatchSecond).includes(token.type));
 			while (token.args[index]!==undefined){
 				joinBinaryOp(
 					token,
 					index,
-					oldNewMatch[token.args[index].type][0],
-					oldNewMatch[token.args[index].type][1],
-					["property","str","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
+					oldNewMatchSecond[token.args[index].type][0],
+					oldNewMatchSecond[token.args[index].type][1],
+					["property","str","variable","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
 					"property, int, statement or List",
+					true
 				);
-				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+				index = token.args.findIndex(token=>Object.keys(oldNewMatchSecond).includes(token.type));
 			}
 
 
