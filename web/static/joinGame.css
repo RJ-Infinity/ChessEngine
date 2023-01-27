@@ -1,0 +1,22 @@
+main div,
+chess-board-{
+	display: block;
+	position: sticky;
+	top: 1em;
+	aspect-ratio: 1 / 1;
+	max-height: calc(100vw - 4.5em /* margin and width of nav */);
+	height: 100%;
+	justify-self: left;
+	border-radius: 1em;
+}
+main{
+	display: grid;
+	height: 100%;
+	box-sizing: border-box;
+	grid-template-columns: auto 1fr;
+}
+@media (orientation: portrait) {
+	main{
+		grid-template-columns: 1fr;
+	}
+}

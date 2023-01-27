@@ -1,0 +1,281 @@
+chess-board-{
+	display: block;
+	position: sticky;
+	top: 1em;
+	aspect-ratio: 1 / 1;
+	max-width: calc(100vh - 2em);
+	width: 100%;
+	justify-self: center;
+	border-radius: 2%;
+}
+main{
+	display: grid;
+	grid-template-columns: 3fr 2fr;
+	gap: 1em;
+	height: max-content;
+	width: 100%;
+	box-sizing: border-box;
+}
+@media screen and (max-width:650px) {
+	body{
+		height: 100%;
+	}
+	main{
+		grid-template-columns: 1fr;
+		height: 100%;
+		min-height: 0;
+	}
+	chess-board-{
+		position: relative;
+		top: auto;
+	}
+	.settings{
+		min-height: 0;
+		overflow: auto;
+	}
+}
+.setting::before{
+	content: attr(name);
+	grid-column: 1 / span 2;
+}
+.setting{
+	display: grid;
+	height: min-content;
+	width: 100%;
+	margin-bottom: 2em;
+}
+.board-size{
+	grid-template-columns: 1fr 10ch;
+}
+.disabled-sqr{
+	grid-template-columns: max-content 1fr;
+}
+#removeBtn,
+#AddPiece{
+	grid-column: 1 / span 2;
+}
+.setting.pieces{
+	grid-template-columns: 1fr;
+}
+.error>#removeBtn,
+.error>input[type=text],
+#RemovePieceButton:hover{
+	background-color: rgb(255, 90, 90);
+}
+.pieces>ul>li>svg{
+	height: 3em;
+	grid-row: 1 / span 2;
+}
+.pieces>ul>li>span:nth-of-type(2n-1){
+	text-align: right;
+	padding-right: 1ch;
+}
+.pieces>ul>li{
+	list-style: none;
+	display: grid;
+	grid-template-columns: 3em [prop]min-content [value]1fr [button]min-content;
+	border: 1px solid aliceblue;
+	border-radius: .5em;
+	box-shadow: 0 0 4px black;
+	align-items: center;
+	margin: 0.5em;
+	margin-top: 0;
+}
+.pieces>ul{
+	padding-left: 0;
+	margin: 0;
+}
+.piece-prop{
+	grid-column-start: prop;
+	grid-column-end: prop;
+}
+.piece-value{
+	grid-column-start: value;
+	grid-column-end: value;
+}
+#EditPieceButton,
+#RemovePieceButton{
+	grid-column-start: button;
+	grid-column-end: button;
+}
+#EditPieceButton{
+	grid-row: 1;
+}
+.peice-editor{
+	display: grid;
+	border: 1px solid aliceblue;
+	border-radius: .5em;
+	box-shadow: 0 0 4px black;
+	margin: 0 0.5em;
+	grid-template-columns: max-content max-content auto;
+	grid-template-areas:	"svgt svgt svgt"
+							"svgt svgt svgt"
+							"svgt svgt svgt"
+							"";
+}
+.config{
+	background-color: var(--primary-colour-dark);
+	width: max-content;
+	box-sizing: border-box;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-grow: 1;
+}
+.config>span{
+	margin-left: 1em;
+}
+.configs{
+	position: relative;
+	grid-template-columns: 1fr;
+}
+.configs>ul{
+	margin: 0 1em;
+	padding: 0;
+	display: grid;
+	gap: 1em;
+	width: calc(100% - 2em);
+	max-height: 200px;
+	overflow: hidden;
+	transition: height 0.5s;
+}
+.configs>ul>li{
+	width: 100%;
+}
+.configs>#expand{
+	display: none;
+}
+.expand-cover{
+	position: absolute;
+	bottom: 0;
+	width: 100%;
+	height: 2em;
+	left: 50%;
+	transform: translateX(-50%);
+	margin: 0;
+	padding: 0;
+	background: linear-gradient(rgba(var(--primary-colour-light-values),0), var(--primary-colour-light));
+}
+.expand-cover::before,
+.expand-cover::after{
+	content: "";
+	display: block;
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	width: 0.5em;
+	height: 1px;
+	background-color: white;
+	transition: transform 0.5s;
+}
+.expand-cover::before{
+	transform: translateX(-85%) rotate(45deg);
+}
+.expand-cover::after{
+	transform: translateX(-15%) rotate(-45deg);
+}
+#expand:checked ~ ul{
+	max-height: none;
+	margin-bottom: 2em;
+}
+#expand:checked ~ .expand-cover{
+	margin-bottom: 0.5em;
+	height: 1em;
+	width: 1em;
+	background: var(--primary-colour-dark);
+	border-radius: 25%;
+}
+#expand:checked ~ .expand-cover::before{
+	transform: translateX(-85%) rotate(-45deg);
+}
+#expand:checked ~ .expand-cover::after{
+	transform: translateX(-15%) rotate(45deg);
+}
+.json{
+	grid-template-columns: 1fr;
+}
+.json>div{
+	max-height: 100%;
+	height: 20em;
+	border: 2px solid black;
+	margin: 0 1em;
+	height: 400px;
+	position: relative;
+}
+.start-btn{
+	font-size: 1.25em;
+	width: calc(100% - 2em);
+	box-sizing: content-box;
+	justify-content: center;
+}
+#jsonMoacoFullCheck{
+	opacity: 0;
+	position:absolute;
+	pointer-events: none;
+}
+label[for=jsonMoacoFullCheck]{
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 1.5em;
+	height: 1.5em;
+	z-index: 5;
+	background-color: var(--secondary-colour-light);
+	border-bottom-right-radius: 0.2em;
+	accent-color: var(--secondary-colour-dark);
+}
+label[for=jsonMoacoFullCheck]>.min{
+	display: none;
+}
+#jsonMoacoFullCheck:focus-visible + div label[for=jsonMoacoFullCheck]{
+	outline: 2px solid var(--secondary-colour-dark);
+}
+#jsonMoacoFullCheck:checked + div label[for=jsonMoacoFullCheck]>.min{
+	display: block;
+}
+#jsonMoacoFullCheck:checked + div label[for=jsonMoacoFullCheck]>.full{
+	display: none;
+}
+#jsonMoacoFullCheck:not(:checked) + div{
+	width: calc(100% - 2em - 4px);
+	animation: fix-width 1ms;
+}
+@keyframes fix-width {
+	0%,100%{
+		width: 1px;
+	}
+}
+#jsonMoacoFullCheck:checked + div{
+	position: fixed;
+	top: 0;
+	left: 0;
+	z-index: 20;
+	margin: 0;
+	border: none;
+	height: 100vh;
+	width: calc(100vw - 20px);
+	min-width: calc(100vw - 20px);
+}
+@supports selector(A:has(B)){
+	#jsonMoacoFullCheck:checked + div{
+		width: 100vw;
+		min-width: 100vw;
+	}
+	body:has(> main #jsonMoacoFullCheck:checked){
+		overflow: hidden;
+	}
+}
+[type=monaco-wrapper]{
+	position: relative;
+}
+[type=monaco-wrapper]>[type=monaco]{
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+#escapeJsonMonaco:focus-visible{
+	/* outline: none; */
+	bottom: 0;
+}

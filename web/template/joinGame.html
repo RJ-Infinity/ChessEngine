@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {%block title%}Join Game{%endblock%}
 {%block head%}
+	<link rel="stylesheet" href="/static/joinGame.css">
 	<style>
 		.join-box{
 			display: flex;
@@ -20,10 +21,5 @@
 			<span>Join Game</span>
 		</button>
 	</div>
-	<script>
-		pinInput = document.getElementById("JoinPin");
-		pinInput.addEventListener("keydown",e=>{if (event.key == "Enter"){Join();}});
-		function Join(){window.location.href = `/Game/${pinInput.value}`}
-		document.getElementById("JoinButton").addEventListener("click",Join);
-	</script>
+	<script src="static/joinGame.js"></script>
 {%endblock%}
