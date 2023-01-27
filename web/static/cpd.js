@@ -180,7 +180,7 @@ export class CPD{
 				case ":":{pushToken("condition",token.pos);}break;
 				case "/":{pushToken("div",token.pos);}break;
 				case ",":{pushToken("sep",token.pos);}break;
-				/*TODO*/case "!":{pushToken("inv",token.pos);}break;
+				case "!":{pushToken("inv",token.pos);}break;
 				case "\"":{
 					addToken("PieceRef",token.pos);
 					pieceRefState="open";
@@ -191,14 +191,14 @@ export class CPD{
 				/*TODO*/case "→":{pushToken("map",token.pos);}break;
 				case "=":{pushToken("set",token.pos);}break;
 				/*TODO*/case ";":{pushToken("ins",token.pos);}break;
-				/*TODO*/case "&&":{pushToken("and",token.pos);}break;
-				/*TODO*/case "||":{pushToken("or",token.pos);}break;
-				/*TODO*/case "==":{pushToken("eq",token.pos);}break;
-				/*TODO*/case "<<":{pushToken("lt",token.pos);}break;
-				/*TODO*/case ">>":{pushToken("gt",token.pos);}break;
-				/*TODO*/case "!=":{pushToken("neq",token.pos);}break;
-				/*TODO*/case "<=":{pushToken("leq",token.pos);}break;
-				/*TODO*/case ">=":{pushToken("geq",token.pos);}break;
+				case "&&":{pushToken("and",token.pos);}break;
+				case "||":{pushToken("or",token.pos);}break;
+				case "==":{pushToken("eq",token.pos);}break;
+				case "<<":{pushToken("lt",token.pos);}break;
+				case ">>":{pushToken("gt",token.pos);}break;
+				case "!=":{pushToken("neq",token.pos);}break;
+				case "<=":{pushToken("leq",token.pos);}break;
+				case ">=":{pushToken("geq",token.pos);}break;
 
 				default:{
 					currTT.args.push({
@@ -253,7 +253,7 @@ export class CPD{
 		const joinBinaryOp=(
 			token,
 			index,
-			type,
+			newType,
 			tokenRepr,
 			validTypes,
 			allowedTypes,
@@ -265,16 +265,16 @@ export class CPD{
 					`there must be a value before a '${tokenRepr}'`,
 					token.args[index].pos
 				);
-				joinUnaryOp(token, index, type, tokenRepr, validTypes, allowedTypes)
+				joinUnaryOp(token, index, newType, tokenRepr, validTypes, allowedTypes)
 			}else{
 				assert(
 					validTypes.includes(token.args[index-1].type) &&
-					validTypes.includes(token.args[index+1].type),
+					validTypes.includes(token.args[index+1]?.type),
 					`can only use a '${tokenRepr}' on a ${allowedTypes}`,
 					token.args[index].pos
 				);
 				token.args[index-1] = {
-					type:type,
+					type:newType,
 					pos:token.args[index-1].pos,
 					recurse:false,
 					args:[ParseArgs(token.args[index-1]),ParseArgs(token.args[index+1])]
@@ -284,25 +284,25 @@ export class CPD{
 		}
 		const joinBinaryOps=(
 			token,
-			type,
-			tokenType,
+			newType,
+			oldType,
 			tokenRepr,
 			validTypes,
 			allowedTypes,
 			tryUnary=false
 		)=>{
-			var index = token.args.findIndex(token=>token.type==tokenType);
+			var index = token.args.findIndex(token=>token.type==oldType);
 			while (token.args[index]!==undefined){
 				joinBinaryOp(
 					token,
 					index,
-					type,
+					newType,
 					tokenRepr,
 					validTypes,
 					allowedTypes,
 					tryUnary
 				);
-				index = token.args.findIndex(token=>token.type==tokenType);
+				index = token.args.findIndex(token=>token.type==oldType);
 			}
 		}
 		const ParseArgs=(token)=>{
@@ -311,17 +311,17 @@ export class CPD{
 			treeRoot.type=token.type;
 			treeRoot.pos=token.pos;
 			treeRoot.recurse=token.recurse;
-			// peiceref
+			// pieceref
 			token.args = token.args.map(t=>{
 				if (t.type !== "PieceRef"){return t;}
 				assert(
 					t.args.length == 1 && t.args[0].type=="text",
-					"a peice ref must contain a single text node",
+					"a piece ref must contain a single text node",
 					t.pos
 				);
 				return {
 					args: t.args[0].args,
-					type: "PeiceReference",
+					type: "PieceReference",
 					recurse: false,
 					pos: t.pos
 				}
@@ -463,6 +463,7 @@ export class CPD{
 			}
 			// variables
 			joinUnaryOps(token,"variable","var","£",["property","str"],"property");
+			//not operator
 			joinUnaryOps(token,"inversion","inv","!",["variable","property","str"],"not");
 			// bidmas
 			// brackets are allready handled by tokeniser
@@ -480,10 +481,10 @@ export class CPD{
 				"sub":["subtraction","-"]
 			}
 			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			var validTypes = ["property","str","variable","int","Statement","division","multiplication","modulus"];
+			var validTypes = ["property","str","variable","int","Statement","division","multiplication","modulus","addition","subtraction"];
 			while (token.args[index]!==undefined){
 				assert(
-					index===0,
+					index!==0,
 					`there must be a value before a '${oldNewMatch[token.args[index].type][1]}'`,
 					token.args[index].pos
 				);
@@ -494,7 +495,7 @@ export class CPD{
 						index+1,
 						oldNewMatchSecond[token.args[index+1].type][0],
 						oldNewMatchSecond[token.args[index+1].type][1],
-						["property","str","variable","int","Statement","division","multiplication","modulus","addition","subtraction"],
+						validTypes,
 						"property, int, statement if proceded by a '"+oldNewMatch[token.args[index].type][1]+"'"
 					);
 				}
@@ -528,7 +529,73 @@ export class CPD{
 				);
 				index = token.args.findIndex(token=>Object.keys(oldNewMatchSecond).includes(token.type));
 			}
+			oldNewMatch = {
+				"gt":["greaterThan",">>"],
+				"lt":["lessThan","<<"],
+				"geq":["greaterThanEq",">="],
+				"leq":["lessThanEq","<="]
+			}
+			// comparisons
+			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			while (token.args[index]!==undefined){
+				joinBinaryOp(
+					token,
+					index,
+					oldNewMatch[token.args[index].type][0],
+					oldNewMatch[token.args[index].type][1],
+					[
+						"property","str","variable","int","Statement",
+						"division","multiplication","modulus",
+						"addition","subtraction","List",
+						"greaterThan","lessThan","greaterThanEq","lessThanEq"
+					],
+					"property, int, statement, bool or List"
+				);
+				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			}
+			oldNewMatch = {
+				"eq":["Equal","=="],
+				"neq":["NotEqual","!="],
+			}
+			// comparisons
+			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			while (token.args[index]!==undefined){
+				joinBinaryOp(
+					token,
+					index,
+					oldNewMatch[token.args[index].type][0],
+					oldNewMatch[token.args[index].type][1],
+					[
+						"inversion","PieceReference",
+						"property","str","variable","int","Statement",
+						"division","multiplication","modulus",
+						"addition","subtraction","List",
+						"greaterThan","lessThan","greaterThanEq","lessThanEq",
+						"Equal", "NotEqual"
+					],
+					"property, int, statement or bool"
+				);
+				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			}
+			joinBinaryOps(token,"logicalAnd","and","and",[
+				"inversion",
+				"property","str","variable","int","Statement",
+				"division","multiplication","modulus",
+				"addition","subtraction","List",
+				"greaterThan","lessThan","greaterThanEq","lessThanEq",
+				"Equal", "NotEqual",
+				"logicalAnd"
+			],"property, int, statement or bool");
 
+			joinBinaryOps(token,"logicalOr","or","or",[
+				"inversion",
+				"property","str","variable","int","Statement",
+				"division","multiplication","modulus",
+				"addition","subtraction","List",
+				"greaterThan","lessThan","greaterThanEq","lessThanEq",
+				"Equal", "NotEqual",
+				"logicalAnd", "logicalOr"
+			],"property, int, statement or bool");
 
 			//↑↑↑↑↑↑↑↑↑↑↑↑↑↑ this is the parsing of the args
 			//↓↓↓↓↓↓↓↓↓↓↓↓↓↓ this is the creation of the treeRoot
