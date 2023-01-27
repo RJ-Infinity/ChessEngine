@@ -285,14 +285,18 @@ export class CPD{
 			treeRoot.recurse=token.recurse;
 			// peiceref
 			token.args = token.args.map(t=>{
-				if (t.type !== "PeiceRef"){return t;}
+				if (t.type !== "PieceRef"){return t;}
 				assert(
 					t.args.length == 1 && t.args[0].type=="text",
 					"a peice ref must contain a single text node",
 					t.pos
 				);
-				t.args = t.args[0].args;
-				return t;
+				return {
+					args: t.args[0].args,
+					type: "PeiceReference",
+					recurse: false,
+					pos: t.pos
+				}
 			});
 			// split text into number and str
 			token.args = token.args.map(t=>{
