@@ -212,6 +212,12 @@ export class CPD{
 			}
 		});
 	}
+	static tokenCloner=(token)=>({
+		type:token.type,
+		args:Array.isArray(token.args)?token.args.map(CPD.tokenCloner):token.args,
+		pos:{line:token.pos.line,char:token.pos.char},
+		recurse:token.recurse
+	})
 	Parser(){
 		if(this.TypeTokens === null){
 			throw "Parser Error: no type tokens, TypeTokens must be added or generated before parsing can start";
@@ -220,6 +226,9 @@ export class CPD{
 			throw "Parser Error: "+message+" at "+this.prettyPrintPos(pos)
 		}}
 		this.SyntaxTree=[];
+		//clone the typeTokens & remove parent
+		var newTokens = this.TypeTokens.args.map(CPD.tokenCloner);
+		// set up recursive funcs
 		const joinUnaryOp=(token, index, type, tokenRepr, validTypes, allowedTypes)=>{
 			assert(
 				validTypes.includes(token.args[index+1].type),
@@ -460,30 +469,12 @@ export class CPD{
 			// division
 			// multiplication
 			// modulus is like division
-
-			token,
-			type,
-			tokenType,
-			tokenRepr,
-			validTypes,
-			allowedTypes,
-			tryUnary=false
-
-			token,
-			index,
-			type,
-			tokenRepr,
-			validTypes,
-			allowedTypes,
-			tryUnary
-
-
 			var oldNewMatch = {
 				"div":["division","/"],
 				"mul":["multiplication","*"],
 				"mod":["modulus","%"],
 			}
-			index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
 			while (token.args[index]!==undefined){
 				joinBinaryOp(
 					token,
@@ -493,7 +484,7 @@ export class CPD{
 					["property","str","int","Statement","division","multiplication","modulus"],
 					"property, int or statement"
 				);
-				index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
 			}
 			// addition
 			// subtraction
@@ -501,7 +492,7 @@ export class CPD{
 				"add":["addition","+"],
 				"sub":["subtraction","-"]
 			}
-			index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
 			while (token.args[index]!==undefined){
 				joinBinaryOp(
 					token,
@@ -511,7 +502,7 @@ export class CPD{
 					["property","str","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
 					"property, int, statement or List",
 				);
-				index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
 			}
 
 
@@ -560,9 +551,8 @@ export class CPD{
 			}
 			return treeRoot;
 		}
-		this.TypeTokens.args.forEach(
-			token=>this.SyntaxTree.push(ParseArgs(token))
-		);
+		// apply modifications
+		newTokens.forEach(token=>this.SyntaxTree.push(ParseArgs(token)));
 	}
 	prettyPrintPos=pos=>`${this.Filename}:${pos.line}:${pos.char}`
 }
