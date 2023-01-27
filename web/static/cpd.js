@@ -458,53 +458,61 @@ export class CPD{
 			// brackets are allready handled by tokeniser
 			// indicies dont yet exist
 			// division
-			joinBinaryOps(
-				token,
-				"division",
-				"div",
-				"/",
-				["property","str","int","Statement","division"],
-				"property, int or statement"
-			);
 			// multiplication
-			joinBinaryOps(
-				token,
-				"multiplication",
-				"mul",
-				"*",
-				["property","str","int","Statement","division","multiplication"],
-				"property, int or statement"
-			);
 			// modulus is like division
-			joinBinaryOps(
-				token,
-				"modulus",
-				"mod",
-				"%",
-				["property","str","int","Statement","division","multiplication","modulus"],
-				"property, int or statement"
-			);
-			// addition
-			joinBinaryOps(
-				token,
-				"addition",
-				"add",
-				"+",
-				["property","str","int","Statement","division","multiplication","modulus","addition","List"],
-				"property, int, statement or List",
-				true
-			);
-			// subtraction
-			joinBinaryOps(
-				token,
-				"subtraction",
-				"sub",
-				"-",
-				["property","str","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
-				"property, int, statement or List",
-				true
-			);
 
+			token,
+			type,
+			tokenType,
+			tokenRepr,
+			validTypes,
+			allowedTypes,
+			tryUnary=false
+
+			token,
+			index,
+			type,
+			tokenRepr,
+			validTypes,
+			allowedTypes,
+			tryUnary
+
+
+			var oldNewMatch = {
+				"div":["division","/"],
+				"mul":["multiplication","*"],
+				"mod":["modulus","%"],
+			}
+			index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+			while (token.args[index]!==undefined){
+				joinBinaryOp(
+					token,
+					index,
+					oldNewMatch[token.args[index].type][0],
+					oldNewMatch[token.args[index].type][1],
+					["property","str","int","Statement","division","multiplication","modulus"],
+					"property, int or statement"
+				);
+				index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+			}
+			// addition
+			// subtraction
+			oldNewMatch = {
+				"add":["addition","+"],
+				"sub":["subtraction","-"]
+			}
+			index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+			while (token.args[index]!==undefined){
+				joinBinaryOp(
+					token,
+					index,
+					oldNewMatch[token.args[index].type][0],
+					oldNewMatch[token.args[index].type][1],
+					["property","str","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
+					"property, int, statement or List",
+				);
+				index = token.args.findIndex(token=>oldNewMatch.keys().includes(token.type));
+			}
 
 
 			//↑↑↑↑↑↑↑↑↑↑↑↑↑↑ this is the parsing of the args
