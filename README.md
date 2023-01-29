@@ -33,8 +33,11 @@ it always starts with a set of angled brakets which mean different things based 
 char | meaning
 -----|-------------------------
 @    | this is defining a piece
+
 (NOTE: this is not complete)
+
 for a piece definition the following structure is defined
+
 - `<` open angled brackets
 - `@` signifies a peice definition
 - `name` this is the piece name that will be used if the peice is ever refered to
