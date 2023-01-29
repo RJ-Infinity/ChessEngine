@@ -75,8 +75,8 @@
 	]
 	//note division is integer only so these comparisons work
 	events=($move:{pos/board.width==0||pos/board.width==7}{
-		board.removePiece(pos);
-		board.setPiece(pos,openSelectPiece(),colour)
+		board.removePiece(pos)
+		board.setPiece(pos,colour.openSelectPiece(),colour)
 	})
 	value=1
 >

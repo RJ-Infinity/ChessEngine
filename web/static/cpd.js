@@ -1,7 +1,7 @@
 const doubleChars = ["&","|","=","<",">"];
 const equalTypes = ["!","<",">"];
 const exprChars = [
-	"@","<",">","-","[","]","$","£","+",".","*","{","}","(",")",":","/",",","!","\"","%","Σ","→","=",";"
+	"@","<",">","-","[","]","$","£","+",".","*","{","}","(",")",":","/",",","!","\"","%","Σ","→","="
 ].concat(doubleChars).concat(equalTypes);
 const whiteSpaceChars = [" ","\t","\n"];
 const numbers = ["1","2","3","4","5","6","7","8","9","0"];
@@ -190,7 +190,6 @@ export class CPD{
 				case "Σ":{pushToken("sum",token.pos);}break;
 				case "→":{pushToken("map",token.pos);}break;
 				case "=":{pushToken("set",token.pos);}break;
-				/*TODO*/case ";":{pushToken("ins",token.pos);}break;
 				case "&&":{pushToken("and",token.pos);}break;
 				case "||":{pushToken("or",token.pos);}break;
 				case "==":{pushToken("eq",token.pos);}break;
@@ -257,7 +256,7 @@ export class CPD{
 			tokenRepr,
 			validTypes,
 			allowedTypes,
-			tryUnary
+			tryUnary=false
 		)=>{
 			if (index===0){
 				assert(
@@ -303,6 +302,27 @@ export class CPD{
 					tryUnary
 				);
 				index = token.args.findIndex(token=>token.type==oldType);
+			}
+		}
+		const joinMultipleBinaryOps=(
+			token,
+			oldNewMatch,
+			validTypes,
+			allowedTypes,
+			tryUnary = false
+		)=>{
+			var index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
+			while (token.args[index]!==undefined){
+				joinBinaryOp(
+					token,
+					index,
+					oldNewMatch[token.args[index].type][0],
+					oldNewMatch[token.args[index].type][1],
+					validTypes,
+					allowedTypes,
+					tryUnary
+				);
+				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
 			}
 		}
 		const ParseArgs=(token)=>{
@@ -376,7 +396,7 @@ export class CPD{
 				if (token.args[index+1].type==="str"){
 					token.args[index] = {
 						type: "namedEvent",
-						name: token.args.splice(index+1, 1)[0],
+						name: token.args.splice(index+1, 1)[0].args,
 						pos:token.args[index].pos,
 						recurse:false
 					};
@@ -399,7 +419,7 @@ export class CPD{
 						type:"implicitEvent",
 						pos:token.args[index].pos,
 						recurse:false,
-						args:token.args[index+1]
+						args:ParseArgs(token.args[index+1])
 					};
 					token.args.splice(index+1, 1);
 				}
@@ -441,8 +461,6 @@ export class CPD{
 					"FATAL UNREACHABLE near",
 					token.args[index-1].pos||token.args[index].pos
 				);
-				// console.log(token.args)
-				// console.log(index)
 				assert(
 					token.args[index+1].type==="str" ||
 					token.args[index+1].type==="Function",
@@ -476,7 +494,7 @@ export class CPD{
 				"mul":["multiplication","*"],
 				"mod":["modulus","%"],
 			}
-			var oldNewMatchSecond = {
+			var oldNewMatchSecondary = {
 				"add":["addition","+"],
 				"sub":["subtraction","-"]
 			}
@@ -489,12 +507,12 @@ export class CPD{
 					token.args[index].pos
 				);
 				// allow to operate on unary + or - i.e. (8*-9)
-				if (["add","sub"].includes(token.args[index+1]?.type)){
+				if (Object.keys(oldNewMatchSecondary).includes(token.args[index+1]?.type)){
 					joinUnaryOp(
 						token,
 						index+1,
-						oldNewMatchSecond[token.args[index+1].type][0],
-						oldNewMatchSecond[token.args[index+1].type][1],
+						oldNewMatchSecondary[token.args[index+1].type][0],
+						oldNewMatchSecondary[token.args[index+1].type][1],
 						validTypes,
 						"property, int, statement if proceded by a '"+oldNewMatch[token.args[index].type][1]+"'"
 					);
@@ -516,67 +534,47 @@ export class CPD{
 			}
 			// addition
 			// subtraction
-			index = token.args.findIndex(token=>Object.keys(oldNewMatchSecond).includes(token.type));
-			while (token.args[index]!==undefined){
-				joinBinaryOp(
-					token,
-					index,
-					oldNewMatchSecond[token.args[index].type][0],
-					oldNewMatchSecond[token.args[index].type][1],
-					["property","str","variable","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
-					"property, int, statement or List",
-					true
-				);
-				index = token.args.findIndex(token=>Object.keys(oldNewMatchSecond).includes(token.type));
-			}
-			oldNewMatch = {
-				"gt":["greaterThan",">>"],
-				"lt":["lessThan","<<"],
-				"geq":["greaterThanEq",">="],
-				"leq":["lessThanEq","<="]
-			}
+			joinMultipleBinaryOps(
+				token,
+				oldNewMatchSecondary,
+				["property","str","variable","int","Statement","division","multiplication","modulus","addition","subtraction","List"],
+				"property, int, statement or List",
+				true
+			);
 			// comparisons
-			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			while (token.args[index]!==undefined){
-				joinBinaryOp(
-					token,
-					index,
-					oldNewMatch[token.args[index].type][0],
-					oldNewMatch[token.args[index].type][1],
-					[
-						"property","str","variable","int","Statement",
-						"division","multiplication","modulus",
-						"addition","subtraction","List",
-						"greaterThan","lessThan","greaterThanEq","lessThanEq"
-					],
-					"property, int, statement, bool or List"
-				);
-				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			}
-			oldNewMatch = {
-				"eq":["Equal","=="],
-				"neq":["NotEqual","!="],
-			}
-			// comparisons
-			index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			while (token.args[index]!==undefined){
-				joinBinaryOp(
-					token,
-					index,
-					oldNewMatch[token.args[index].type][0],
-					oldNewMatch[token.args[index].type][1],
-					[
-						"inversion","PieceReference",
-						"property","str","variable","int","Statement",
-						"division","multiplication","modulus",
-						"addition","subtraction","List",
-						"greaterThan","lessThan","greaterThanEq","lessThanEq",
-						"Equal", "NotEqual"
-					],
-					"property, int, statement or bool"
-				);
-				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
-			}
+			joinMultipleBinaryOps(
+				token,
+				{
+					"gt":["greaterThan",">>"],
+					"lt":["lessThan","<<"],
+					"geq":["greaterThanEq",">="],
+					"leq":["lessThanEq","<="]
+				},
+				[
+					"property","str","variable","int","Statement",
+					"division","multiplication","modulus",
+					"addition","subtraction","List",
+					"greaterThan","lessThan","greaterThanEq","lessThanEq"
+				],
+				"property, int, statement, bool or List"
+			);
+			// equality
+			joinMultipleBinaryOps(
+				token,
+				{
+					"eq":["Equal","=="],
+					"neq":["NotEqual","!="],
+				},
+				[
+					"inversion","PieceReference",
+					"property","str","variable","int","Statement",
+					"division","multiplication","modulus",
+					"addition","subtraction","List",
+					"greaterThan","lessThan","greaterThanEq","lessThanEq",
+					"Equal", "NotEqual"
+				],
+				"property, int, statement or bool"
+			);
 			joinBinaryOps(token,"logicalAnd","and","and",[
 				"inversion",
 				"property","str","variable","int","Statement",
@@ -626,7 +624,7 @@ export class CPD{
 					type: "mapping",
 					pos: token.args[1].pos,
 					recurse: false,
-					variable: token.args[0],
+					variable: token.args[0].args,
 					map: ParseArgs(token.args[2])
 				}
 			}
@@ -654,7 +652,6 @@ export class CPD{
 					pos:{line:token.args[0].pos.line,char:token.args[0].pos.char},
 					recurse:token.args[0].recurse
 				});
-				console.log(sigmaVariable);
 				assert(
 					(
 						sigmaVariable.type === "Statement" &&
@@ -710,13 +707,19 @@ export class CPD{
 					assert(token.args[index]?.type==="set","named property name must be followed by '='",token.args[index]?.pos||token.args[index-1].pos);
 					index++;
 					assert(token.args[index] !== undefined,"named property must have a value",token.args[index-1].pos);
-					treeRoot.properties.push({type:"namedProperty",key:name.args,value:ParseArgs(token.args[index])});
+					treeRoot.properties.push({
+						type:"namedProperty",
+						key:name.args,
+						value:ParseArgs(token.args[index]),
+						pos: name.pos
+					});
 					index++;
 				}
 			}
 			if (
 				treeRoot.type === "Statement" ||
-				treeRoot.type === "condExpr"
+				treeRoot.type === "condExpr" ||
+				treeRoot.type === "Expresion"
 			){
 				treeRoot.args=token.args.map(arg=>ParseArgs(arg));
 			}
