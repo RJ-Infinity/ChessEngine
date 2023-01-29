@@ -47,7 +47,7 @@ export class CPD{
 			if (!allValidChars.includes(char)){
 				throw `Lexer Error: invalid char '${char}' at ${this.prettyPrintPos({line:line,char:character})}`;
 			}
-			if (char == "\n"){
+			if (char === "\n"){
 				line++;
 				character = 0;
 				if (inComment){
@@ -68,20 +68,20 @@ export class CPD{
 			}
 
 			if (
-				this.Tokens.at(-1)?.content == "/" &&
-				char == "*" &&
-				this.Tokens.at(-1)?.pos.line == line &&
-				this.Tokens.at(-1)?.pos.char == character-1
+				this.Tokens.at(-1)?.content === "/" &&
+				char === "*" &&
+				this.Tokens.at(-1)?.pos.line === line &&
+				this.Tokens.at(-1)?.pos.char === character-1
 			){
 				inInlineComment = true;
 				this.Tokens.pop();
 				currExpr="";
 				currExprPos = null;
 			}else if (
-				this.Tokens.at(-1)?.content == "/" &&
-				char == "/" &&
-				this.Tokens.at(-1)?.pos.line == line &&
-				this.Tokens.at(-1)?.pos.char == character-1
+				this.Tokens.at(-1)?.content === "/" &&
+				char === "/" &&
+				this.Tokens.at(-1)?.pos.line === line &&
+				this.Tokens.at(-1)?.pos.char === character-1
 			){
 				inComment = true;
 				this.Tokens.pop();
@@ -91,15 +91,15 @@ export class CPD{
 				if (currExpr.length>0){addToken(currExpr,currExprPos);}
 				if(
 					doubleChars.includes(char) &&
-					this.Tokens.at(-1)?.content == char &&
-					this.Tokens.at(-1)?.pos.line == line &&
-					this.Tokens.at(-1)?.pos.char == character-1
+					this.Tokens.at(-1)?.content === char &&
+					this.Tokens.at(-1)?.pos.line === line &&
+					this.Tokens.at(-1)?.pos.char === character-1
 				){this.Tokens.at(-1).content = char+char;}
 				else if(
 					char=="=" &&
 					equalTypes.includes(this.Tokens.at(-1)?.content) &&
-					this.Tokens.at(-1)?.pos.line == line &&
-					this.Tokens.at(-1)?.pos.char == character-1
+					this.Tokens.at(-1)?.pos.line === line &&
+					this.Tokens.at(-1)?.pos.char === character-1
 				){this.Tokens.at(-1).content += char;}
 				else{addToken(char,{line:line,char:character});}
 			}else if(whiteSpaceChars.includes(char)){
@@ -187,8 +187,8 @@ export class CPD{
 					currTT.recurse = false;
 				}break;
 				case "%":{pushToken("mod",token.pos);}break;
-				/*TODO*/case "Σ":{pushToken("sum",token.pos);}break;
-				/*TODO*/case "→":{pushToken("map",token.pos);}break;
+				case "Σ":{pushToken("sum",token.pos);}break;
+				case "→":{pushToken("map",token.pos);}break;
 				case "=":{pushToken("set",token.pos);}break;
 				/*TODO*/case ";":{pushToken("ins",token.pos);}break;
 				case "&&":{pushToken("and",token.pos);}break;
@@ -315,7 +315,7 @@ export class CPD{
 			token.args = token.args.map(t=>{
 				if (t.type !== "PieceRef"){return t;}
 				assert(
-					t.args.length == 1 && t.args[0].type=="text",
+					t.args.length === 1 && t.args[0].type=="text",
 					"a piece ref must contain a single text node",
 					t.pos
 				);
@@ -380,11 +380,11 @@ export class CPD{
 						pos:token.args[index].pos,
 						recurse:false
 					};
-					if (token.args[index+1].type == "condExpr"){
+					if (token.args[index+1].type === "condExpr"){
 						token.args[index].conditionalExpresion = ParseArgs(token.args.splice(index+1, 1)[0]);
 					}
 					assert(
-						token.args[index+1].type == "Expresion",
+						token.args[index+1].type === "Expresion",
 						"A named event must be followed by an optional conditional expresion then an expresion block",
 						token.args[index].pos
 					);
@@ -600,10 +600,103 @@ export class CPD{
 			//↑↑↑↑↑↑↑↑↑↑↑↑↑↑ this is the parsing of the args
 			//↓↓↓↓↓↓↓↓↓↓↓↓↓↓ this is the creation of the treeRoot
 
+			// variable mapping
 
+			index = token.args.findIndex(token=>token.type==="map");
+			if(token.args[index]!==undefined){
+				assert(
+					index>0 &&
+					token.args[index-1].type === "str",
+					"a mapping must be proceded by a variable mapping",
+					token.args[index].pos
+				);
+				assert(
+					token.type === "Statement" &&
+					index === 1 &&
+					token.args.length === 3,
+					"a maping must by the only item in a statement",
+					token.args[index].pos
+				);
+				assert(
+					token.args[index+1].type === "Statement",
+					"a mapping's map must be enclosed in a statement",
+					token.args[index].pos
+				);
+				treeRoot = {
+					type: "mapping",
+					pos: token.args[1].pos,
+					recurse: false,
+					variable: token.args[0],
+					map: ParseArgs(token.args[2])
+				}
+			}
+			
+			// sigma notation
+
+			index = token.args.findIndex(token=>token.type==="sum");
+			if (token.args[index]!==undefined){
+				//this dosent need to be while as sigma must be the only item in a statement
+				assert(
+					index>1 &&
+					token.args[index-1].type === "Statement" &&
+					token.args[index-2].type === "Statement",
+					"sigma notation must have a proceding variable and initial value each in brackets '()'",
+					token.args[index].pos
+				);
+				assert(
+					token.type === "Statement" && index === 2,
+					"sigma notation must the the only item in a statement",
+					token.args[index].pos
+				)
+				var sigmaVariable=ParseArgs({
+					type:token.args[0].type,
+					args:token.args[0].args.map(CPD.tokenCloner),
+					pos:{line:token.args[0].pos.line,char:token.args[0].pos.char},
+					recurse:token.args[0].recurse
+				});
+				console.log(sigmaVariable);
+				assert(
+					(
+						sigmaVariable.type === "Statement" &&
+						sigmaVariable.args.length === 1 &&
+						sigmaVariable.args[0].type === "str"
+					) || sigmaVariable.type === "mapping",
+					"sigma notation must have a variable or mapping of a variable as its -2 argument",
+					token.args[2].pos
+				);
+				token.args.splice(0,1);
+				treeRoot = {
+					type:"Sigma",
+					variable:sigmaVariable.type === "mapping"?sigmaVariable:sigmaVariable.args[0],
+					pos:token.args[1].pos,
+					recurse:false
+				}
+				treeRoot.initialVal = ParseArgs(token.args.splice(0,1)[0]);
+				treeRoot.finalVal = ParseArgs(token.args.splice(1,1)[0]);
+				if (token.args[1].type === "condExpr"){
+					treeRoot.condExpr = ParseArgs(token.args.splice(1,1)[0]);
+				}
+				assert(
+					token.args[1].type === "Expresion",
+					"a sigma notation must have a value to append to the list",
+					token.args[0].pos
+				);
+				treeRoot.Expr = ParseArgs(token.args.splice(1,1)[0]);
+				assert(
+					token.args.length === 1 || (
+						token.args.length === 2 &&
+						token.args[1].type === "condExpr"
+					),
+					"sigma notation must the the only thing in a statement",
+					token.args[0].pos
+				);
+				if (token.args.length === 2){
+					treeRoot.ExprCondition = ParseArgs(token.args.splice(1,1)[0]);
+				}
+			}
 
 			index = 0;
-			if (token.type==="OuterDefPiece"){
+			if (treeRoot.type==="OuterDefPiece"){
 				assert(token.args[index]?.type === "str","piece definition has no name",token.pos);
 				treeRoot.name = token.args[index].args;
 				treeRoot.type = "PieceDefinition"
@@ -622,12 +715,12 @@ export class CPD{
 				}
 			}
 			if (
-				token.type === "Statement" ||
-				token.type === "condExpr"
+				treeRoot.type === "Statement" ||
+				treeRoot.type === "condExpr"
 			){
 				treeRoot.args=token.args.map(arg=>ParseArgs(arg));
 			}
-			if (token.type === "List"){
+			if (treeRoot.type === "List"){
 				treeRoot.args=token.args.reduce((acc,arg)=>{
 					if(arg.type==="sep"){
 						acc.push([]);
@@ -637,7 +730,7 @@ export class CPD{
 					return acc;
 				},[[]]);
 			}
-			if (token.type==="OuterDef"){
+			if (treeRoot.type==="OuterDef"){
 				treeRoot.args=token.args;
 			}
 			return treeRoot;

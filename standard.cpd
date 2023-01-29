@@ -141,7 +141,7 @@
 	moves=(
 		(//rook moves
 			(i)(pos)Σ(pos-(pos%board.width)+1)//between pos and the leftmost but one square on that row
-			:{board.getPiece(£i)==null||board.getPiece(£i)==self}
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
 			{£i-1}:{
 				£i>=pos-(pos%board.width) &&
 				board.getPiece(£i-1).colour!=colour
@@ -159,7 +159,6 @@
 			(i→(pos+£i*board.width))(0)Σ((board.length-board.width+(pos%board.width)-pos)/board.width)
 			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
 			{£i+board.width}:{board.getPiece(£i+board.width).colour!=colour}
-			//no bounds needed as it will just go out of bounds not overflow
 		)+
 		(
 			(i→(pos-£i*board.width))(0)Σ((pos-(pos%board.width))/board.width)
