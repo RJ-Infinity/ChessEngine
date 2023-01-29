@@ -1,8 +1,8 @@
-Include/
-Lib/
-Scripts/
-pyvenv.cfg
-web/static/ChessBoard.min.js
-web/static/monaco/*
+/Include/
+/Lib/
+/Scripts/
+/pyvenv.cfg
+/web/static/libraries/ChessBoard.min.js
+/web/static/libraries/monaco/*
 bot/
 __pycache__

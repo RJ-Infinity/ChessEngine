@@ -21,6 +21,6 @@ document.querySelectorAll("div[type=monaco]").forEach(el=>{
 	new ResizeObserver((e)=>{
 		if(e[0].target===undefined)return
 		// console.log(e[0])
-		window.monacoEditors.getEditor(e[0].target).layout();
+		// window.monacoEditors.getEditor(e[0].target).layout();
 	}).observe(el)
 })

@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {%block title%}{{pin}}{%endblock%}
 {%block head%}
-	<script src="/static/ChessBoard.min.js"></script>
+	<script src="/static/libraries/ChessBoard.min.js"></script>
 	<script>var pin = "{{pin}}";</script>
-	<link rel="stylesheet" href="/static/Game.css">
+	<link rel="stylesheet" href="/static/styles/Game.css">
 {%endblock%}
 {%block main%}
 	<chess-board-></chess-board->
@@ -18,5 +18,5 @@
 		</form>
 	</dialog>
 	<dialog id="ErrorModal"></dialog>
-	<script src="static/Game.js"></script>
+	<script src="static/scripts/Game.js"></script>
 {%endblock%}

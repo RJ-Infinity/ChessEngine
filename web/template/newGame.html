@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {%block title%}New Game{%endblock%}
 {%block head%}
-	<script src="/static/ChessBoard.min.js"></script>
-	<link rel="stylesheet" data-name="vs/editor/editor.main" href="/static/monaco/min/vs/editor/editor.main.css">
-	<link rel="stylesheet" href="/static/newGame.css">
+	<script src="/static/libraries/ChessBoard.min.js"></script>
+	<link rel="stylesheet" data-name="vs/editor/editor.main" href="/static/libraries/monaco/min/vs/editor/editor.main.css">
+	<link rel="stylesheet" href="/static/styles/newGame.css">
 {%endblock%}
 {%block main%}
 	<chess-board- id="ChessBoard">
@@ -83,9 +83,9 @@
 	</dialog>
 	<script>var require = { paths: { 'vs': 'static/monaco/min/vs' } };</script>
 
-	<script src="/static/monaco/min/vs/loader.js"></script>
-	<script src="/static/monaco/min/vs/editor/editor.main.nls.js"></script>
-	<script src="/static/monaco/min/vs/editor/editor.main.js"></script>
-	<script src="/static/monacoAddon.js"></script>
-	<script src="/static/newGame.js"></script>
+	<script src="/static/libraries/monaco/min/vs/loader.js"></script>
+	<script src="/static/libraries/monaco/min/vs/editor/editor.main.nls.js"></script>
+	<script src="/static/libraries/monaco/min/vs/editor/editor.main.js"></script>
+	<script src="/static/scripts/monacoAddon.js"></script>
+	<script src="/static/scripts/newGame.js"></script>
 {%endblock%}
