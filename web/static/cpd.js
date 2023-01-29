@@ -325,6 +325,14 @@ export class CPD{
 				index = token.args.findIndex(token=>Object.keys(oldNewMatch).includes(token.type));
 			}
 		}
+		const splitBySep=(acc,arg)=>{
+			if(arg.type==="sep"){
+				acc.push([]);
+			}else{
+				acc.at(-1).push(ParseArgs(arg));
+			}
+			return acc;
+		}
 		const ParseArgs=(token)=>{
 			if (!token.recurse){return token;}
 			var treeRoot = {};
@@ -367,13 +375,15 @@ export class CPD{
 				token.args[i+1]?.type==="Statement"
 			);
 			while (token.args[index]!==undefined){
-				var functionStatement = ParseArgs(token.args[index+1]);
+
+				var functionArgs=ParseArgs(token.args[index+1]).args.reduce(splitBySep,[[]]);
+
 				token.args[index] = {
 					type:"Function",
 					pos:token.args[index].pos,
 					recurse:false,
 					name:token.args[index].args,
-					args: functionStatement.args
+					args: functionArgs
 				};
 				token.args.splice(index+1, 1);
 				index = token.args.findIndex(
@@ -724,14 +734,7 @@ export class CPD{
 				treeRoot.args=token.args.map(arg=>ParseArgs(arg));
 			}
 			if (treeRoot.type === "List"){
-				treeRoot.args=token.args.reduce((acc,arg)=>{
-					if(arg.type==="sep"){
-						acc.push([]);
-					}else{
-						acc.at(-1).push(ParseArgs(arg));
-					}
-					return acc;
-				},[[]]);
+				treeRoot.args=token.args.reduce(splitBySep,[[]]);
 			}
 			if (treeRoot.type==="OuterDef"){
 				treeRoot.args=token.args;
