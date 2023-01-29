@@ -1,4 +1,7 @@
 // chess piece definition file
+<#
+	name=white
+>
 <@knight
 	moves=[
 		pos-board.width-2,
@@ -76,7 +79,7 @@
 	//note division is integer only so these comparisons work
 	events=($move:{pos/board.width==0||pos/board.width==7}{
 		board.removePiece(pos)
-		board.setPiece(pos,colour.openSelectPiece(),colour)
+		board.setPiece(pos,colour.openSelectPiece("queen","knight","rook","bishop"),colour)
 	})
 	value=1
 >
