@@ -1,7 +1,7 @@
 const doubleChars = ["&","|","=","<",">"];
 const equalTypes = ["!","<",">"];
 const exprChars = [
-	"@","<",">","-","[","]","$","£","+",".","*","{","}","(",")",":","/",",","!","\"","%","Σ","→","="
+	"@","#","<",">","-","[","]","$","£","+",".","*","{","}","(",")",":","/",",","!","\"","%","Σ","→","="
 ].concat(doubleChars).concat(equalTypes);
 const whiteSpaceChars = [" ","\t","\n"];
 const numbers = ["1","2","3","4","5","6","7","8","9","0"];
@@ -162,6 +162,10 @@ export class CPD{
 				case "@":{
 					assert(currTT.type==="OuterDef","'@' must be the first token in a 'OuterDef'",token.pos);
 					currTT.type+="Piece";
+				}break;
+				case "#":{
+					assert(currTT.type==="OuterDef","'#' must be the first token in a 'OuterDef'",token.pos);
+					currTT.type+="Colour";
 				}break;
 				case "<":{addToken("OuterDef",token.pos);}break;
 				case ">":{closeToken(currTT.type.startsWith("OuterDef"),"unmatched '>'",token.pos);}break;
@@ -333,6 +337,27 @@ export class CPD{
 			}
 			return acc;
 		}
+		const namedPropertyParser=(token,index)=>{
+			var name;
+			var properties = [];
+			while (token.args[index] !== undefined){
+				name = token.args[index];
+				assert(name.type==="str","named property key must be a text Node",name.pos);
+				index++;
+				assert(token.args[index]?.type==="set","named property name must be followed by '='",token.args[index]?.pos||token.args[index-1].pos);
+				index++;
+				assert(token.args[index] !== undefined,"named property must have a value",token.args[index-1].pos);
+				properties.push({
+					type:"namedProperty",
+					key:name.args,
+					value:ParseArgs(token.args[index]),
+					pos: name.pos
+				});
+				index++;
+			}
+			return properties;
+		}
+		var ColourCount = 0;
 		const ParseArgs=(token)=>{
 			if (!token.recurse){return token;}
 			var treeRoot = {};
@@ -702,29 +727,17 @@ export class CPD{
 				}
 			}
 
-			index = 0;
 			if (treeRoot.type==="OuterDefPiece"){
-				assert(token.args[index]?.type === "str","piece definition has no name",token.pos);
-				treeRoot.name = token.args[index].args;
+				assert(token.args[0]?.type === "str","piece definition has no name",token.pos);
+				treeRoot.name = token.args[0].args;
 				treeRoot.type = "PieceDefinition"
-				treeRoot.properties = [];
-				index++;
-				var name;
-				while (token.args[index] !== undefined){
-					name = token.args[index];
-					assert(name.type==="str","named property key must be a text Node",name.pos);
-					index++;
-					assert(token.args[index]?.type==="set","named property name must be followed by '='",token.args[index]?.pos||token.args[index-1].pos);
-					index++;
-					assert(token.args[index] !== undefined,"named property must have a value",token.args[index-1].pos);
-					treeRoot.properties.push({
-						type:"namedProperty",
-						key:name.args,
-						value:ParseArgs(token.args[index]),
-						pos: name.pos
-					});
-					index++;
-				}
+				treeRoot.properties = namedPropertyParser(token, 1);
+			}
+			if (treeRoot.type==="OuterDefColour"){
+				treeRoot.colourIndex = ColourCount;
+				ColourCount++;
+				treeRoot.type = "ColourDefinition"
+				treeRoot.properties = namedPropertyParser(token, 0);
 			}
 			if (
 				treeRoot.type === "Statement" ||

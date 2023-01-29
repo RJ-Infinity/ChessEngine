@@ -1,7 +1,6 @@
 // chess piece definition file
-<#
-	name=white
->
+<# name=white direction=(width)>
+<# name=black direction=(-width)>
 <@knight
 	moves=[
 		pos-board.width-2,
