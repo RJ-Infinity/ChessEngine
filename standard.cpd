@@ -1,6 +1,6 @@
 // chess piece definition file
-<# name=white direction=(width)>
-<# name=black direction=(-width)>
+<# name=white direction=(board.width)>
+<# name=black direction=(-board.width)>
 <@knight
 	moves=[
 		pos-board.width-2,
@@ -67,18 +67,18 @@
 			board.getPiece(pos+1).colour!=colour &&
 			board.getPiece(pos+1).lastmove==board.getPiece(pos+1).colour.lastmove &&
 			board.getPiece(pos+1).lastmove.distance==board.getPiece(pos+1).colour.direction*2
-		}${board.takePiece(pos+1)},
+		}${colour.takePiece(pos+1)},
 		pos+colour.direction-1:{
 			board.getPiece(pos-1)=="pawn" &&
 			board.getPiece(pos+1).colour!=colour &&
 			board.getPiece(pos-1).lastmove==board.getPiece(pos-1).colour.lastmove &&
 			board.getPiece(pos-1).lastmove.distance==board.getPiece(pos-1).colour.direction*2
-		}${board.takePiece(pos-1)},
+		}${colour.takePiece(pos-1)},
 	]
 	//note division is integer only so these comparisons work
 	events=($move:{pos/board.width==0||pos/board.width==7}{
 		board.removePiece(pos)
-		board.setPiece(pos,colour.openSelectPiece("queen","knight","rook","bishop"),colour)
+		board.setPiece(pos,colour.openSelectPiece(["queen","knight","rook","bishop"]),colour)
 	})
 	value=1
 >
