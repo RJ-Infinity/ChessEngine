@@ -7,7 +7,7 @@ const whiteSpaceChars = [" ","\t","\n"];
 const numbers = ["1","2","3","4","5","6","7","8","9","0"];
 const letters = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
 const allValidChars = exprChars.concat(whiteSpaceChars).concat(numbers).concat(letters);
-export class CPD{
+export class CPDInterpreter{
 	// TODO: Add indicies suport exponent
 	Data = null;
 	Tokens = null;
@@ -217,7 +217,7 @@ export class CPD{
 	}
 	static tokenCloner=(token)=>({
 		type:token.type,
-		args:Array.isArray(token.args)?token.args.map(CPD.tokenCloner):token.args,
+		args:Array.isArray(token.args)?token.args.map(CPDInterpreter.tokenCloner):token.args,
 		pos:{line:token.pos.line,char:token.pos.char},
 		recurse:token.recurse
 	})
@@ -230,7 +230,7 @@ export class CPD{
 		}}
 		this.SyntaxTree=[];
 		//clone the typeTokens & remove parent
-		var newTokens = this.TypeTokens.args.map(CPD.tokenCloner);
+		var newTokens = this.TypeTokens.args.map(CPDInterpreter.tokenCloner);
 		// set up recursive funcs
 		const joinUnaryOp=(token, index, type, tokenRepr, validTypes, allowedTypes)=>{
 			assert(
@@ -357,7 +357,6 @@ export class CPD{
 			}
 			return properties;
 		}
-		var ColourCount = 0;
 		const ParseArgs=(token)=>{
 			if (!token.recurse){return token;}
 			var treeRoot = {};
@@ -683,7 +682,7 @@ export class CPD{
 				)
 				var sigmaVariable=ParseArgs({
 					type:token.args[0].type,
-					args:token.args[0].args.map(CPD.tokenCloner),
+					args:token.args[0].args.map(CPDInterpreter.tokenCloner),
 					pos:{line:token.args[0].pos.line,char:token.args[0].pos.char},
 					recurse:token.args[0].recurse
 				});
@@ -734,8 +733,6 @@ export class CPD{
 				treeRoot.properties = namedPropertyParser(token, 1);
 			}
 			if (treeRoot.type==="OuterDefColour"){
-				treeRoot.colourIndex = ColourCount;
-				ColourCount++;
 				treeRoot.type = "ColourDefinition"
 				treeRoot.properties = namedPropertyParser(token, 0);
 			}
@@ -759,5 +756,75 @@ export class CPD{
 	}
 	prettyPrintPos=pos=>`${this.Filename}:${pos.line}:${pos.char}`
 }
+export class CPDExecutionContext{
+	_interpreter;
+	PeiceTypes=[];
+	_peiceDefinitions=[];
+	Colours=[];
+	_colourDefinitions=[];
+	constructor(interpreter, width){
+		if(interpreter.SyntaxTree === null){
+			throw "Execution Error: no interpreter data, Data must be added before execution context can initiate";
+		}
+		this._interpreter = interpreter;
+		interpreter.SyntaxTree.forEach(el=>{switch (el.type) {
+			case "PieceDefinition":{
+				this.PeiceTypes.push(el.name);
+				this._peiceDefinitions.push(el);
+			}break;
+			case "ColourDefinition":{
+				this.Colours.push(new CPDColour(this, el));
+				this._colourDefinitions.push(el);
+			}break;
+			default:{
+				throw "Execution Error: the roots of the syntax tree must be definition types";
+			}
+		}});
+	}
+}
+// class CPDMove{
+// 	distance;
+// 	from;
+// 	to;
+// }
+// function UNIMPLIMENTED(){console.error("ERROR function "+arguments.callee.caller.name+" not defined");} 
+// class CPDPeice{
+// 	pos;
+// 	board;
+// 	colour;
+// 	inCheck;
+// 	moveCount;
+// 	moveTo(pos){UNIMPLIMENTED()};
+// 	lastmove;
+// 	_peice;
+// 	constructor(ctx, peice, colour){
+// 		this._peice = peice;
+// 		this.colour = colour;
+// 	}
+// }
+// class CPDBoard{
+// 	width;
+// 	getPiece(pos){return this._board[pos];}
+// 	isAttacked(pos){UNIMPLIMENTED()};
+// 	removePiece(pos){this._board[pos]=null};
+// 	setPiece(pos,peice,colour){this._board[pos]=new CPDPeice(peice,colour)};
+// 	constructor(ctx, width){
+// 		this.width = width;
+// 		this._board = [...Array(width*width)];
+// 	}
+// 	_board = []
+// }
+// class CPDColour{
+// 	constructor(ctx, el){
+// 		this.colour = el.properties.find(p=>p.key==="name");
+// 		if (this.colour === undefined){
+// 			throw "Execution Error: colour is missing a name at "+ctx._interpreter.prettyPrintPos(el.pos);
+// 		}
 
-window.CPD = CPD;
+// 	};
+// 	loose(){UNIMPLIMENTED()};
+// 	direction;
+// 	takePiece(pos){UNIMPLIMENTED()};
+// 	openSelectPiece(peiceChoice){UNIMPLIMENTED()};
+// 	colour;
+// }
