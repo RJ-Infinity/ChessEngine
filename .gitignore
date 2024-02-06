@@ -1,7 +1,4 @@
-/Include/
-/Lib/
-/Scripts/
-/pyvenv.cfg
+/py/
 /web/static/libraries/ChessBoard.min.js
 /web/static/libraries/monaco/*
 bot/

@@ -1,0 +1,1 @@
+wasm-pack build --out-dir ..\web\static\libraries\cpd --target web
