@@ -6,7 +6,7 @@ mod test;
 fn is_double_char(chr: &char)->bool{ ['&','|','=','<','>'].contains(chr) }
 fn is_equal_type(chr: &char)->bool{ ['!','<','>'].contains(chr) }
 fn is_expr_char(chr: &char)->bool{['@','#','<','>','-','[',']','$','£','+','.','*','{','}','(',')',':','/',',','!','"','%','Σ','→','='].contains(chr) || is_double_char(chr) || is_equal_type(chr) }
-fn is_white_space_char(chr: &char)->bool{ [' ','\t','\n'].contains(chr) }
+fn is_white_space_char(chr: &char)->bool{ [' ','\t','\r','\n'].contains(chr) }
 fn is_number(chr: &char)->bool{ ['1','2','3','4','5','6','7','8','9','0'].contains(chr) }
 fn is_letter(chr: &char)->bool{ ['a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'].contains(chr) }
 fn is_all_valid_char(chr: &char)->bool{ is_expr_char(chr) || is_white_space_char(chr) || is_number(chr) || is_letter(chr) }
@@ -124,13 +124,10 @@ impl Interpreter{
 					curr_expr=String::new();
 					curr_expr_pos = None;
 				}
-				if 
-					is_double_char(&chr) &&
-					tokens.last() == Some(&Token{
-						content: chr.to_string(),
-						pos: Pos::new(pos.line, pos.chr-1)
-					})
-				{tokens.last_mut().unwrap().content += &chr.to_string()}
+				if is_double_char(&chr) && tokens.last() == Some(&Token{
+					content: chr.to_string(),
+					pos: Pos::new(pos.line, pos.chr-1)
+				}) {tokens.last_mut().unwrap().content += &chr.to_string()}
 				else if
 					chr=='=' && if let Some(last) = tokens.last(){
 						last.content.chars().count() == 1 &&
@@ -149,12 +146,14 @@ impl Interpreter{
 					curr_expr_pos = None;
 				}
 			}else{
-				if let Some(first_chr) = curr_expr.chars().next(){
-					if is_number(&first_chr) && is_letter(&chr){
-						tokens.push(Token{content: curr_expr, pos: curr_expr_pos.unwrap(),});
-						curr_expr=String::new();
-						curr_expr_pos = None;
-					}
+				if
+					let Some(first_chr) = curr_expr.chars().next()
+					&& is_number(&first_chr)
+					&& is_letter(&chr)
+				{
+					tokens.push(Token{content: curr_expr, pos: curr_expr_pos.unwrap(),});
+					curr_expr=String::new();
+					curr_expr_pos = None;
 				}
 				if curr_expr_pos==None { curr_expr_pos=Some(pos.clone()); }
 				curr_expr+=&chr.to_string()
