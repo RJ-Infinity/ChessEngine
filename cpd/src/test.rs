@@ -59,12 +59,22 @@ fn lexer(){
 		Token{content: ",".to_string(), pos: Pos{line: 2, chr: 58}},
 		Token{content: "parse".to_string(), pos: Pos{line: 2, chr: 59}},
 	]));
-	assert_eq!(lex_str!("block /* comments should also work */ both \n on one /*line and when split\nover */ multiple"), Some(vec![
+	assert_eq!(lex_str!("block /* comments should also work */ both \n on one /*line and when split\nover */ multiple /* also it should /* ignore another opening */ block comment in the comment"), Some(vec![
 		Token{content: "block".to_string(), pos: Pos{line: 1, chr: 1}},
 		Token{content: "both".to_string(), pos: Pos{line: 1, chr: 39}},
 		Token{content: "on".to_string(), pos: Pos{line: 2, chr: 2}},
 		Token{content: "one".to_string(), pos: Pos{line: 2, chr: 5}},
 		Token{content: "multiple".to_string(), pos: Pos{line: 3, chr: 9}},
+		Token{content: "block".to_string(), pos: Pos{line: 3, chr: 65}},
+		Token{content: "comment".to_string(), pos: Pos{line: 3, chr: 71}},
+		Token{content: "in".to_string(), pos: Pos{line: 3, chr: 79}},
+		Token{content: "the".to_string(), pos: Pos{line: 3, chr: 82}},
+		Token{content: "comment".to_string(), pos: Pos{line: 3, chr: 86}},
+	]));
+	assert_eq!(lex_str!("block // comment opening /* should be ignored\nin line /* comments and // visa \n versa */ "), Some(vec![
+		Token{content: "block".to_string(), pos: Pos{line: 1, chr: 1}},
+		Token{content: "in".to_string(), pos: Pos{line: 2, chr: 1}},
+		Token{content: "line".to_string(), pos: Pos{line: 2, chr: 4}},
 	]));
 	//double types (any should work for the robust testing)
 	assert_eq!(lex_str!("= = == == = && || << >>"), Some(vec![
