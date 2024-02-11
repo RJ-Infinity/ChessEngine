@@ -1,6 +1,6 @@
 const CPD_DATA: &str = include_str!("../../standard.cpd");
 
-use crate::{Data, Error, Expresion, Interpreter, Parse, Pos, Range, Token, Variable};
+use crate::{Data, Expresion, Interpreter, OuterDef, Parse, Pos, Range, Token, Variable};
 use itertools::peek_nth;
 
 #[test]
@@ -8,11 +8,11 @@ fn test_std(){
 	// this doesnt test if the stdlib is parsed correctly just that it dosent crash whilst doing it
 	let mut int = Interpreter::new("<test>".to_string());
 	int.data = Some(CPD_DATA.to_string());
-	if let Err(e) = int.lexer(){panic!("{}",e.as_string(int))};
+	if let Err(e) = int.lexer(){panic!("{}",e.error_string(&int, None))};
 	// int.parser().unwrap();
 }
 
-macro_rules! lex_str {($lit:literal) => {{
+macro_rules! lex_str{($lit:literal) =>{{
 	let mut int = Interpreter::new("<test>".to_string());
 	int.data = Some($lit.to_string());
 	int.lexer().unwrap();
@@ -35,73 +35,73 @@ fn lexer(){
 	},]));
 	//expr types, comments
 	assert_eq!(lex_str!("the // comments and white space should be ignored\n(but + the.things == on* (the /next) line/ should ),still,parse"),Some(vec![
-		Token {content: "the".to_string(), pos: Pos{line: 1, chr: 1}},
-		Token {content: "(".to_string(), pos: Pos{line: 2, chr: 1}},
-		Token {content: "but".to_string(), pos: Pos{line: 2, chr: 2}},
-		Token {content: "+".to_string(), pos: Pos{line: 2, chr: 6}},
-		Token {content: "the".to_string(), pos: Pos{line: 2, chr: 8}},
-		Token {content: ".".to_string(), pos: Pos{line: 2, chr: 11}},
-		Token {content: "things".to_string(), pos: Pos{line: 2, chr: 12}},
-		Token {content: "==".to_string(), pos: Pos{line: 2, chr: 19}},
-		Token {content: "on".to_string(), pos: Pos{line: 2, chr: 22}},
-		Token {content: "*".to_string(), pos: Pos{line: 2, chr: 24}},
-		Token {content: "(".to_string(), pos: Pos{line: 2, chr: 26}},
-		Token {content: "the".to_string(), pos: Pos{line: 2, chr: 27}},
-		Token {content: "/".to_string(), pos: Pos{line: 2, chr: 31}},
-		Token {content: "next".to_string(), pos: Pos{line: 2, chr: 32}},
-		Token {content: ")".to_string(), pos: Pos{line: 2, chr: 36}},
-		Token {content: "line".to_string(), pos: Pos{line: 2, chr: 38}},
-		Token {content: "/".to_string(), pos: Pos{line: 2, chr: 42}},
-		Token {content: "should".to_string(), pos: Pos{line: 2, chr: 44}},
-		Token {content: ")".to_string(), pos: Pos{line: 2, chr: 51}},
-		Token {content: ",".to_string(), pos: Pos{line: 2, chr: 52}},
-		Token {content: "still".to_string(), pos: Pos{line: 2, chr: 53}},
-		Token {content: ",".to_string(), pos: Pos{line: 2, chr: 58}},
-		Token {content: "parse".to_string(), pos: Pos{line: 2, chr: 59}},
+		Token{content: "the".to_string(), pos: Pos{line: 1, chr: 1}},
+		Token{content: "(".to_string(), pos: Pos{line: 2, chr: 1}},
+		Token{content: "but".to_string(), pos: Pos{line: 2, chr: 2}},
+		Token{content: "+".to_string(), pos: Pos{line: 2, chr: 6}},
+		Token{content: "the".to_string(), pos: Pos{line: 2, chr: 8}},
+		Token{content: ".".to_string(), pos: Pos{line: 2, chr: 11}},
+		Token{content: "things".to_string(), pos: Pos{line: 2, chr: 12}},
+		Token{content: "==".to_string(), pos: Pos{line: 2, chr: 19}},
+		Token{content: "on".to_string(), pos: Pos{line: 2, chr: 22}},
+		Token{content: "*".to_string(), pos: Pos{line: 2, chr: 24}},
+		Token{content: "(".to_string(), pos: Pos{line: 2, chr: 26}},
+		Token{content: "the".to_string(), pos: Pos{line: 2, chr: 27}},
+		Token{content: "/".to_string(), pos: Pos{line: 2, chr: 31}},
+		Token{content: "next".to_string(), pos: Pos{line: 2, chr: 32}},
+		Token{content: ")".to_string(), pos: Pos{line: 2, chr: 36}},
+		Token{content: "line".to_string(), pos: Pos{line: 2, chr: 38}},
+		Token{content: "/".to_string(), pos: Pos{line: 2, chr: 42}},
+		Token{content: "should".to_string(), pos: Pos{line: 2, chr: 44}},
+		Token{content: ")".to_string(), pos: Pos{line: 2, chr: 51}},
+		Token{content: ",".to_string(), pos: Pos{line: 2, chr: 52}},
+		Token{content: "still".to_string(), pos: Pos{line: 2, chr: 53}},
+		Token{content: ",".to_string(), pos: Pos{line: 2, chr: 58}},
+		Token{content: "parse".to_string(), pos: Pos{line: 2, chr: 59}},
 	]));
 	assert_eq!(lex_str!("block /* comments should also work */ both \n on one /*line and when split\nover */ multiple"), Some(vec![
-		Token {content: "block".to_string(), pos: Pos{line: 1, chr: 1}},
-		Token {content: "both".to_string(), pos: Pos{line: 1, chr: 39}},
-		Token {content: "on".to_string(), pos: Pos{line: 2, chr: 2}},
-		Token {content: "one".to_string(), pos: Pos{line: 2, chr: 5}},
-		Token {content: "multiple".to_string(), pos: Pos{line: 3, chr: 9}},
+		Token{content: "block".to_string(), pos: Pos{line: 1, chr: 1}},
+		Token{content: "both".to_string(), pos: Pos{line: 1, chr: 39}},
+		Token{content: "on".to_string(), pos: Pos{line: 2, chr: 2}},
+		Token{content: "one".to_string(), pos: Pos{line: 2, chr: 5}},
+		Token{content: "multiple".to_string(), pos: Pos{line: 3, chr: 9}},
 	]));
 	//double types (any should work for the robust testing)
 	assert_eq!(lex_str!("= = == == = && || << >>"), Some(vec![
-		Token {content: "=".to_string(), pos: Pos{line: 1, chr: 1}},
-		Token {content: "=".to_string(), pos: Pos{line: 1, chr: 3}},
-		Token {content: "==".to_string(), pos: Pos{line: 1, chr: 5}},
-		Token {content: "==".to_string(), pos: Pos{line: 1, chr: 8}},
-		Token {content: "=".to_string(), pos: Pos{line: 1, chr: 11}},
-		Token {content: "&&".to_string(), pos: Pos{line: 1, chr: 13}},
-		Token {content: "||".to_string(), pos: Pos{line: 1, chr: 16}},
-		Token {content: "<<".to_string(), pos: Pos{line: 1, chr: 19}},
-		Token {content: ">>".to_string(), pos: Pos{line: 1, chr: 22}},
+		Token{content: "=".to_string(), pos: Pos{line: 1, chr: 1}},
+		Token{content: "=".to_string(), pos: Pos{line: 1, chr: 3}},
+		Token{content: "==".to_string(), pos: Pos{line: 1, chr: 5}},
+		Token{content: "==".to_string(), pos: Pos{line: 1, chr: 8}},
+		Token{content: "=".to_string(), pos: Pos{line: 1, chr: 11}},
+		Token{content: "&&".to_string(), pos: Pos{line: 1, chr: 13}},
+		Token{content: "||".to_string(), pos: Pos{line: 1, chr: 16}},
+		Token{content: "<<".to_string(), pos: Pos{line: 1, chr: 19}},
+		Token{content: ">>".to_string(), pos: Pos{line: 1, chr: 22}},
 	]));
 	// presedence shouldnt matter as this should always be invalid
 	assert_eq!(lex_str!("==="),Some(vec![
-		Token {content: "==".to_string(), pos: Pos::new(1, 1)},
-		Token {content: "=".to_string(), pos: Pos::new(1, 3)},
+		Token{content: "==".to_string(), pos: Pos::new(1, 1)},
+		Token{content: "=".to_string(), pos: Pos::new(1, 3)},
 	]));
 	//equal types
 	assert_eq!(lex_str!("!= <= >= !=!="),Some(vec![
-		Token {content: "!=".to_string(), pos: Pos::new(1, 1)},
-		Token {content: "<=".to_string(), pos: Pos::new(1, 4)},
-		Token {content: ">=".to_string(), pos: Pos::new(1, 7)},
-		Token {content: "!=".to_string(), pos: Pos{line: 1, chr: 10}},
-		Token {content: "!=".to_string(), pos: Pos{line: 1, chr: 12}},
+		Token{content: "!=".to_string(), pos: Pos::new(1, 1)},
+		Token{content: "<=".to_string(), pos: Pos::new(1, 4)},
+		Token{content: ">=".to_string(), pos: Pos::new(1, 7)},
+		Token{content: "!=".to_string(), pos: Pos{line: 1, chr: 10}},
+		Token{content: "!=".to_string(), pos: Pos{line: 1, chr: 12}},
 	]));
 	// that numbers split but tokens can contain numbers if the dont start with them
 	assert_eq!(lex_str!("0test test0 test0test 12345"),Some(vec![
-		Token {content: "0".to_string(), pos: Pos::new(1, 1)},
-		Token {content: "test".to_string(), pos: Pos::new(1, 2)},
-		Token {content: "test0".to_string(), pos: Pos::new(1, 7)},
-		Token {content: "test0test".to_string(), pos: Pos{line: 1, chr: 13}},
-		Token {content: "12345".to_string(), pos: Pos{line: 1, chr: 23}},
+		Token{content: "0".to_string(), pos: Pos::new(1, 1)},
+		Token{content: "test".to_string(), pos: Pos::new(1, 2)},
+		Token{content: "test0".to_string(), pos: Pos::new(1, 7)},
+		Token{content: "test0test".to_string(), pos: Pos{line: 1, chr: 13}},
+		Token{content: "12345".to_string(), pos: Pos{line: 1, chr: 23}},
 	]));
 }
 
-macro_rules! get_token_gen {($data: literal) => {{
+macro_rules! get_token_gen{($data: literal) =>{{
 	let mut int = Interpreter::new("<test>".to_string());
 	int.data = Some($data.to_string());
 	int.lexer().unwrap();
@@ -130,6 +130,35 @@ fn expresion_parser(){
 			Data::Value(1, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
 			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
 		)))
+	);
+	assert_eq!(
+		Expresion::parse(
+			Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+			get_token_gen!(" /9")
+		),
+		Ok(Ok(Expresion::Division(
+			Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+			Data::Value(9, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 3}}
+		)))
+	);
+	assert!(Expresion::parse(
+		Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+		get_token_gen!(" asdf")
+	).is_err());
+}
+#[test]
+fn outer_def_parser(){
+	assert_eq!(
+		OuterDef::parse(get_token_gen!("<# name=white direction=forwards>")),
+		Ok(OuterDef::Colour{
+			name: "white".to_string(),
+			direction: Data::Variable(Variable{
+				route: vec!["forwards".to_string()],
+				range: Range{start: Pos{line: 1, chr: 25}, end: Pos{line: 1, chr: 32}}
+			},Range{start: Pos{line: 1, chr: 25}, end: Pos{line: 1, chr: 32}}),
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 33}}
+		})
 	);
 	assert_eq!(
 		Expresion::parse(
