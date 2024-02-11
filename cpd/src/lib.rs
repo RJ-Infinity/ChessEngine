@@ -1,6 +1,7 @@
 #![feature(let_chains)]
+#![feature(option_take_if)]
 
-use std::ops::Add;
+use std::ops::{Add, Sub};
 use itertools::{PeekNth, peek_nth};
 
 use wasm_bindgen::prelude::*;
@@ -27,7 +28,10 @@ impl Add<usize> for Pos{
 	type Output = Self;
 	fn add(self, rhs: usize) -> Self{Self{line: self.line, chr: self.chr + rhs}}
 }
-
+impl Sub<usize> for Pos{
+	type Output = Self;
+	fn sub(self, rhs: usize) -> Self{Self{line: self.line, chr: self.chr - rhs}}
+}
 
 #[derive(PartialEq, Clone, Copy, Debug)]
 #[wasm_bindgen]
@@ -43,13 +47,24 @@ impl Range{
 			chr: last.pos.chr+last.content.chars().count()-1
 		}
 	}}
+	fn from_token(token: &Token)->Self{Self {
+		start: token.pos,
+		end: token.pos+token.content.chars().count()-1
+	}}
 	fn from_pos(pos: Pos)->Self{Self{start: pos, end: pos}}
 }
 impl From<Pos> for Range{fn from(pos: Pos) -> Self {Self::from_pos(pos)}}
 impl From<&Pos> for Range{fn from(pos: &Pos) -> Self {Self::from_pos(pos.clone())}}
 impl From<&mut Pos> for Range{fn from(pos: &mut Pos) -> Self {Self::from_pos(pos.clone())}}
+impl From<Token> for Range{fn from(token: Token) -> Self {Self::from_token(&token)}}
+impl From<&Token> for Range{fn from(token: &Token) -> Self {Self::from_token(token)}}
+impl From<&mut Token> for Range{fn from(token: &mut Token) -> Self {Self::from_token(token)}}
 
-trait Ranged{fn get_range(&self)->&Range;}
+
+trait Ranged{
+	fn get_range(&self)->&Range;
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T);
+}
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Token{
@@ -59,24 +74,39 @@ pub struct Token{
 
 #[wasm_bindgen]
 #[derive(PartialEq, Clone, Debug)]
-pub struct Error{
-	error: String,
+pub struct UserMessage{
+	message: String,
 	location: Option<Range>,
+	note: Option<Box<UserMessage>>,
 }
-impl Error{
-	pub fn new(error: String, location: Option<Range>)->Self{Self{error, location}}
-	pub fn as_string(&self, int: Interpreter)->String{
+impl UserMessage{
+	pub fn new(message: impl Into<String>, location: impl Into<Range>)->Self{Self{
+		message: message.into(),
+		location: Some(location.into()),
+		note: None,
+	}}
+	pub fn new_with_note(message: impl Into<String>, location: Option<Range>, note: UserMessage)->Self{Self{
+		message: message.into(),
+		location,
+		note: Some(note.into()),
+	}}
+	pub fn error_string(&self, int: &Interpreter, message_prefix: Option<&str>)->String{
 		// TODO: Handle tabs properly
 		let empty = " ";
 		let termination = "^";
 		let underline = "=";
 		let mut rv = String::new();
-		rv += &format!("Encountered error `{}` in file {}", self.error, int.filename);
+		rv += &format!(
+			"{} `{}` in file {}",
+			message_prefix.unwrap_or("Encountered error"),
+			self.message,
+			int.filename
+		);
 		if let Some(loc) = self.location{
 			rv += &format!(":{}:{}\n", loc.start.line, loc.start.chr);
-			let Some(data) = int.data else{return format!("ERROR: error refers to data which is not existent on the Interpreter passed in. This error was encountered whilst handling the error `{}`.",self.error)};
+			let Some(ref data) = int.data else{return format!("ERROR: error refers to data which is not existent on the Interpreter passed in. This error was encountered whilst handling the message `{}`.",self.message)};
 			let mut lines = data.split('\n');
-			let Some(first_line) = lines.nth(loc.start.line-1) else{return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the error `{}`.",loc.start.line, self.error)};
+			let Some(first_line) = lines.nth(loc.start.line-1) else{return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the message `{}`.",loc.start.line, self.message)};
 			let first_line = first_line.replace("\t", "    ");
 			let padding = loc.end.line.to_string().chars().count() + 1;
 			let first_lineno_len = loc.start.line.to_string().chars().count();
@@ -94,11 +124,11 @@ impl Error{
 				rv+=&underline.repeat(first_line.chars().count() - loc.start.chr - 1);
 				rv+="\n";
 				if loc.end.line - loc.start.line - 1 > 5{
-					if lines.nth(loc.end.line - loc.start.line - 2).is_none(){return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the error `{}`.",loc.end.line, self.error)}
+					if lines.nth(loc.end.line - loc.start.line - 2).is_none(){return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the message `{}`.",loc.end.line, self.message)}
 					rv += &empty.repeat(padding);
 					rv += "...\n";
 				}else{for i in 0..loc.end.line - loc.start.line - 1{
-					let Some(line) = lines.next() else{return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the error `{}`.",loc.start.line+i+1, self.error)};
+					let Some(line) = lines.next() else{return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the message `{}`.",loc.start.line+i+1, self.message)};
 					let line = line.replace("\t", "    ");
 					let line_no_len = (loc.start.line+i+1).to_string().chars().count();
 
@@ -110,7 +140,7 @@ impl Error{
 					rv += &underline.repeat(line.chars().count());
 					rv += "\n";
 				}}
-				let Some(line) = lines.next() else{return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the error `{}`.",loc.end.line, self.error)};
+				let Some(line) = lines.next() else{return format!("ERROR: error refers to line no. {}, which is not existent on the Interpreter passed in. This error was encountered whilst handling the message `{}`.",loc.end.line, self.message)};
 				let line = line.replace("\t", "    ");
 				rv += &loc.end.line.to_string();
 				rv += &empty.repeat(padding-1);
@@ -123,19 +153,28 @@ impl Error{
 		}
 		rv += "\n";
 
+		if let Some(note) = &self.note{rv += &note.error_string(int, Some("with note"))}
+
 		return rv;
 	}
 }
-trait Parse {fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, String> where Self: Sized;}
+impl From<String> for UserMessage{fn from(value: String) -> Self {Self{
+	message: value,
+	location: None,
+	note: None,
+}}}
+impl From<&str> for UserMessage{fn from(value: &str) -> Self {Self{
+	message: value.to_string(),
+	location: None,
+	note: None,
+}}}
+trait Parse {fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage> where Self: Sized;}
 
 #[derive(Debug, PartialEq)]
 struct RootExpr(pub Vec<OuterDef>);
-impl Parse for RootExpr{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, String>{
+impl Parse for RootExpr{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
 	let mut root = RootExpr(vec!());
-	while token_gen.peek().is_some(){
-		root.0.push(OuterDef::parse(token_gen)?);
-		println!("{:#?}",root.0.last().unwrap());
-	}
+	while token_gen.peek().is_some(){root.0.push(OuterDef::parse(token_gen)?)}
 	return Ok(root);
 }}
 #[derive(Debug, PartialEq)]
@@ -146,70 +185,108 @@ enum OuterDef{
 		range: Range,
 	},
 	Peice{
-		moves:Vec<Move>,
-		events: Vec<Event>,
+		moves:List<Move>,
+		events: List<Event>,
 		checkable: bool,
 		value: usize,
 		range: Range,
 	},
 }
 
-macro_rules! cond_where {($cond:expr; where $pat:pat = $expr:expr) => {
-	if let $pat = $expr {$cond}else{false}
-};}
-impl Parse for OuterDef{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, String>{
-	let Some(first_token) = token_gen.next() else {panic!()};
-	if first_token.content != "<"{panic!()};
-	let Some(kind_token) = token_gen.next() else{panic!()};
+macro_rules! properties {($token_gen:expr, $first_token: expr, $constructor: path, {$($prop: ident => $parse: expr;)*}) => {{
+	$(
+		let mut $prop = None;
+	)?
+	let last_token = loop{
+		let Some(token) = $token_gen.next() else{return Err(UserMessage::new("mismatched `<` expected a closing tag for the opening angled bracket.", $first_token.pos))};
+		match token.content.as_str(){
+			$(
+				stringify!($prop)=>{
+					let Some(token) = $token_gen.next() else{return Err("expected `=` hoever reached the end of the file".into())};
+					if token.content != "="{return Err(UserMessage::new(format!("expected `=` however got `{}`",token.content), token))}
+					$prop = Some($parse)
+				},
+			)?
+			">"=>break token,
+			_=>return Err(UserMessage::new(format!("invalid token `{}` in the definition",token.content), token)),
+		}
+	};
+	let range = Range::from_first_last_token($first_token, last_token);
+	$(
+		let Some($prop) = $prop else{return Err(UserMessage::new(format!("expected the property {} in the definition.",stringify!($prop)),range));};
+	)?
+	$constructor{
+		$(
+			$prop,
+		)?
+		range
+	}
+}};}
+impl Parse for OuterDef{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
+	let Some(first_token) = token_gen.next() else {panic!("EOF")};// this condition should be handled by root Expr
+	if first_token.content != "<"{return Err(UserMessage::new(format!("expected `<` to open a definition however got `{}`",first_token.content),first_token))};
+	let Some(kind_token) = token_gen.next() else{return Err("expected a definition type however reached the end of the file".into())};
 	return Ok(match kind_token.content.as_str(){
-		"#"=>{
-			let mut name = None;
-			let mut direction = None;
-
-			let last_token = loop{
-				let Some(token) = token_gen.next() else{return Err(format!("mismatched `<` expected a closing tag for the opening angled bracket found at {:?}.", first_token.pos))};
-				match token.content.as_str(){
-					"name"=>{
-						if !cond_where!(token.content == "="; where Some(token) = token_gen.next()){panic!();}
-						name = Some(token_gen.next().unwrap().content.clone());
-					}
-					"direction"=>{
-						if !cond_where!(token.content == "="; where Some(token) = token_gen.next()){panic!();}
-						direction = Some(Data::parse(token_gen)?);
-					}
-					">"=>break token,
-					_=>panic!()
+		"#"=>properties!(token_gen, first_token, OuterDef::Colour, {
+			name=>{
+				let Some(token) = token_gen.next()else{return Err("expected a name however reached the end of the file".into())};
+				if !is_letter(&token.content.chars().next().expect("the lexer shouldnt emit empty token")){
+					return Err(UserMessage::new("expected the name to be made up of characters", token));
 				}
+				token.content.clone()
 			};
-			let Some(name) = name else{return Err(format!("TODOMSG"));};
-			let Some(direction) = direction else{return Err(format!("TODOMSG"));};
-
-			OuterDef::Colour {
-				name,
-				direction,
-				range: Range::from_first_last_token(first_token, last_token)
-			}
-		}
-		"@"=>{
-
-			todo!();
-		}
-		v=>{return Err(String::from(v));}
+			direction=>Data::parse(token_gen)?;
+		}),
+		"@"=>properties!(token_gen, first_token, OuterDef::Peice, {
+			moves=>List::parse(token_gen)?;
+			events=>List::parse(token_gen)?;
+			checkable=>todo!();
+			value=>todo!();
+		}),
+		v=>{return Err(UserMessage::new(format!("invalid type of definition `{}` the valid types are `#` or `@`",v),kind_token));}
 	});
 }}
-impl Ranged for OuterDef{fn get_range(&self)->&Range {match self{
-	OuterDef::Colour { name:_, direction:_, range } |
-	OuterDef::Peice { moves:_, events:_, checkable:_, value:_, range } => range,
-}}}
+impl Ranged for OuterDef{
+	fn get_range(&self)->&Range {match self{
+		OuterDef::Colour { name:_, direction:_, range } |
+		OuterDef::Peice { moves:_, events:_, checkable:_, value:_, range } => range,
+	}}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
+		OuterDef::Colour { name:_, direction:_, ref mut range } |
+		OuterDef::Peice { moves:_, events:_, checkable:_, value:_, ref mut range } => *range = setter(&range),
+	}}
+}
 
 #[derive(Debug, PartialEq)]
 struct Move{
 
 }
+impl Parse for Move{fn parse<'a>(_token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
+	todo!()
+}}
+impl Ranged for Move{
+	fn get_range(&self)->&Range {
+		todo!()
+	}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, _setter: T) {
+		todo!()
+	}
+}
 
 #[derive(Debug, PartialEq)]
 struct Event{
 
+}
+impl Parse for Event{fn parse<'a>(_token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
+	todo!()
+}}
+impl Ranged for Event{
+	fn get_range(&self)->&Range {
+		todo!()
+	}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, _setter: T) {
+		todo!()
+	}
 }
 #[derive(Debug, PartialEq)]
 enum Expresion{
@@ -221,7 +298,7 @@ enum Expresion{
 	Division(Data, Data, Range),
 }
 const OOO: [&str; 4]=["+","-","*","/"];
-macro_rules! next_ooo {($op: ident) => {OOO[OOO.iter().position(|o|o==&$op).expect("failed")+1]};}
+macro_rules! next_ooo {($op: ident) => {OOO[OOO.iter().position(|o|o==&$op).expect("parse_ooo should always provide valid data")+1]};}
 impl Expresion{
 	fn get_binary_expr(op: &str, lhs:Data, rhs:Data)->Expresion{
 		let lhs_range = *lhs.get_range();
@@ -231,7 +308,7 @@ impl Expresion{
 			"-"=>Expresion::BinarySubtraction,
 			"*"=>Expresion::Multipication,
 			"/"=>Expresion::Division,
-			_=>panic!("invalid op"),
+			_=>panic!("invalid op"), // this case should be handled by parse_ooo
 		}(lhs, rhs, Range{
 			start: lhs_range.start,
 			end: rhs_range.end,
@@ -240,7 +317,7 @@ impl Expresion{
 	///parses the order of operations
 	fn parse_ooo(operations: Vec<&Token>, mut data: Vec<Data>, op: &str)->Expresion{
 		fn get_data(mut data_vec: Vec<Data>, ops: Vec<&Token>, op: &str)->Data
-		{if data_vec.len() == 1{data_vec.pop().expect("just checke the length")}else{
+		{if data_vec.len() == 1{data_vec.pop().expect("just checked the length")}else{
 			let data = Expresion::parse_ooo(ops, data_vec, op);
 			let range = *data.get_range();
 			Data::Expresion(data.into(),range)
@@ -272,7 +349,7 @@ impl Expresion{
 	fn parse<'a>(
 		lhs: Data,
 		token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>
-	)->Result<Result<Self, String>, Data>{
+	)->Result<Result<Self, UserMessage>, Data>{
 		let Some(op_token) = token_gen.peek()else{return Err(lhs);};
 		if !OOO.contains(&op_token.content.as_str()){return Err(lhs);}
 		let Some(op_token) = token_gen.next()else{panic!("peek failed")};
@@ -297,7 +374,7 @@ impl Expresion{
 
 		return Ok(Ok(Self::parse_ooo(operations, data, OOO[0])));
 	}
-	fn parse_unary<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Option<Result<Self, String>>{
+	fn parse_unary<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Option<Result<Self, UserMessage>>{
 		let mut unary_tokens = vec!();
 		while let Some(token) = token_gen.next_if(|t|
 			t.content == "-" ||
@@ -320,41 +397,54 @@ impl Expresion{
 			rv = Some(match token.content.as_str(){
 				"-"=>Expresion::UnarySubtraction,
 				"+"=>Expresion::UnaryAddition,
-				_=>panic!()
+				_=>panic!("this is handled at the begining of the function")
 			}(base, range));
 		}
 		return rv.map(|v|Ok(v));
 	}
 }
-impl Ranged for Expresion{fn get_range(&self)->&Range{match self{
-	Expresion::UnaryAddition(_, r) |
-	Expresion::UnarySubtraction(_, r) |
-	Expresion::BinaryAddition(_, _, r) |
-	Expresion::BinarySubtraction(_, _, r) |
-	Expresion::Multipication(_, _, r) |
-	Expresion::Division(_, _, r) => r,
-}}}
+impl Ranged for Expresion{
+	fn get_range(&self)->&Range{match self{
+		Expresion::UnaryAddition(_, r) |
+		Expresion::UnarySubtraction(_, r) |
+		Expresion::BinaryAddition(_, _, r) |
+		Expresion::BinarySubtraction(_, _, r) |
+		Expresion::Multipication(_, _, r) |
+		Expresion::Division(_, _, r) => r,
+	}}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
+		Expresion::UnaryAddition(_, ref mut r) |
+		Expresion::UnarySubtraction(_, ref mut r) |
+		Expresion::BinaryAddition(_, _, ref mut r) |
+		Expresion::BinarySubtraction(_, _, ref mut r) |
+		Expresion::Multipication(_, _, ref mut r) |
+		Expresion::Division(_, _, ref mut r) => *r = setter(&r),
+	}}
+}
 #[derive(Debug, PartialEq)]
 struct Variable{
 	route: Vec<String>,
 	range: Range,
 }
-impl Parse for Variable{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, String>{
-	let Some(first_token) = token_gen.next() else{panic!()};
+impl Parse for Variable{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
+	let Some(first_token) = token_gen.next() else{return Err("expected a variable reference however reached the end of the file".into())};
 	let mut route = vec!();
 	let mut curr_token = first_token;
 	loop{
-		let Some(first_char) = curr_token.content.chars().next()else{panic!()};
-		if !is_letter(&first_char){panic!()}
+		let Some(first_char) = curr_token.content.chars().next()else{panic!("the lexer shoudnt emmit tokens with no length")};
+		if !is_letter(&first_char){return Err(UserMessage::new(format!("expected a variable however a variable cannot start with `{}`", first_char),curr_token))}
 		route.push(curr_token.content.clone());
 		let Some(sep) = token_gen.peek()else{break;};
 		if sep.content != "."{break;}
 		token_gen.next().expect("peek failed");
-		curr_token = match token_gen.next(){Some(v)=>v,None=>panic!()};
+		curr_token = match token_gen.next(){Some(v)=>v,None=>return Err("expected a variable path identifier after the `.` however reached the end of the file".into())};
 	}
 	Ok(Self{route, range: Range::from_first_last_token(first_token, curr_token)})
 }}
-impl Ranged for Variable{fn get_range(&self)->&Range{&self.range}}
+impl Ranged for Variable{
+	fn get_range(&self)->&Range{&self.range}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T){self.range = setter(&self.range)}
+}
 
 #[derive(Debug, PartialEq)]
 enum Data{
@@ -364,17 +454,18 @@ enum Data{
 }
 impl Data{
 	/// this can acctualy include an expr but only when it is contained within brackets
-	fn parse_without_expr<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, String>{
-		if token_gen.next_if(|token|token.content == "(").is_some(){
+	fn parse_without_expr<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
+		if let Some(opening) = token_gen.next_if(|token|token.content == "("){
 			let rv = Data::parse(token_gen)?;
-			return if
-				let Some(token) = token_gen.next()
-				&& token.content == ")"
-			{Ok(rv)}else{panic!("{:?}",rv)}
+			return if let Some(closing) = token_gen.next(){
+				if closing.content == ")"{
+					Ok(rv)
+				}else{Err(UserMessage::new_with_note(format!("expected a closing brace however got `{}`", closing.content), Some(closing.into()), UserMessage::new("this is probably supposed to close this bracket", opening)))}
+			}else{Err(UserMessage::new_with_note("expected a closing brace however reached the end of the file", None, UserMessage::new("this is probably supposed to close this bracket", opening)))}
 		}
 
-		let Some(first_token) = token_gen.peek() else{panic!()};
-		let Some(first_char) = first_token.content.chars().next() else{panic!()};
+		let Some(first_token) = token_gen.peek() else{return Err("expected data however reached the end of the file".into())};
+		let Some(first_char) = first_token.content.chars().next() else{panic!("lexer shouldnt emit empty tokens")};
 		if is_letter(&first_char){
 			let var = Variable::parse(token_gen)?;
 			let range = var.range;
@@ -382,19 +473,19 @@ impl Data{
 		}else if is_number(&first_char){
 			let first_token = token_gen.next().expect("peek failed");
 			return Ok(Data::Value(first_token.content.parse().map_err(
-				|_|format!("Failed to parse int {}",first_token.content)
+				|_|UserMessage::new(format!("Failed to parse int {}",first_token.content), Range::from_token(first_token))
 			)?, Range::from_first_last_token(first_token, first_token)))
 		}
-		panic!()
+		return Err(UserMessage::new(format!("Expected data however got `{}` try putting a number literal, mathmatical expresion or a variable reference",first_token.content),*first_token))
 	}
-	fn parse_unary<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Option<Result<Self, String>>{
+	fn parse_unary<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Option<Result<Self, UserMessage>>{
 		let Some(unary) = Expresion::parse_unary(token_gen) else{return None;};
 		let unary = match unary{Ok(v)=>v,Err(e)=>return Some(Err(e))};
 		let range = *unary.get_range();
 		Some(Ok(Data::Expresion(unary.into(), range)))
 	}
 }
-impl Parse for Data{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, String>{
+impl Parse for Data{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
 	let first_data = if let Some(unary) = Self::parse_unary(token_gen){unary?}else{
 		Self::parse_without_expr(token_gen)?
 	};
@@ -405,11 +496,38 @@ impl Parse for Data{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a 
 		Data::Expresion(expr.into(),range)
 	}, Err(first_data)=>first_data})
 }}
-impl Ranged for Data{fn get_range(&self)->&Range{match self{
-	Data::Expresion(_, r) |
-	Data::Value(_, r) |
-	Data::Variable(_, r) => r,
-}}}
+impl Ranged for Data{
+	fn get_range(&self)->&Range{match self{
+		Data::Expresion(_, r) |
+		Data::Value(_, r) |
+		Data::Variable(_, r) => r,
+	}}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
+		Data::Expresion(_, ref mut r) |
+		Data::Value(_, ref mut r) |
+		Data::Variable(_, ref mut r) => *r = setter(&r),
+	}}
+}
+
+#[derive(Debug, PartialEq)]
+struct List<T:Parse+Ranged>{
+	data: Vec<T>,
+	range: Range,
+}
+impl<T:Parse+Ranged> List<T>{
+
+}
+impl<T:Parse+Ranged> Parse for List<T>{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
+	let Some(first_token) = token_gen.next() else{return Err("expected a list however the file ended".into())};
+	if first_token.content != "["{return Err(UserMessage::new(format!("expected a list however got `{}` to start a list use the `[` token", first_token.content), Range::from_token(first_token)))}
+	loop{
+
+	}
+}}
+impl<T:Parse+Ranged> Ranged for List<T>{
+	fn get_range(&self)->&Range {&self.range}
+	fn set_range<Fn:FnOnce(&Range)->Range>(&mut self, setter: Fn) {self.range = setter(&self.range)}
+}
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Interpreter{
@@ -442,42 +560,41 @@ impl Interpreter{
 		filename: filename,
 	}}
 	///preforms the lexing. Requires data to be not None
-	pub fn lexer(&mut self) -> Result<(),Error>{
-		if self.data.is_none(){return Err(Error::new("Lexer Error: no data, Data must be added before lexing can start".to_string(),None));}
+	pub fn lexer(&mut self) -> Result<(),UserMessage>{
+		let Some(data) = &self.data else{return Err("Lexer Error: no data, Data must be added before lexing can start".into());};
 		
 		let mut tokens = Vec::new();
 		let pos = &mut Pos{
 			line: 1,
 			chr: 0,
 		};
-		let mut curr_expr = String::new();
-		let mut curr_expr_pos = None;
+		let mut curr_expr:Option<(String, Pos)> = None;
 		let mut in_inline_comment = false;
 		let mut in_comment = false;
 
-		for chr in self.data.as_ref().unwrap().chars(){
+		for chr in data.chars(){
 			pos.chr+=1;
-			if !is_all_valid_char(&chr){return Err(Error::new(format!("Lexer Error: invalid char '{}'", chr),Some(pos.into())));}
+			if !is_all_valid_char(&chr){return Err(UserMessage::new(format!("Lexer Error: invalid char '{}'", chr),pos));}
 			if chr == '\n'{
 				pos.line+=1;
 				pos.chr=0;
 				if in_comment{
 					in_comment = false;
-					curr_expr = String::new();
-					curr_expr_pos = None;
+					curr_expr = None;
 				}
 			}
-			if in_inline_comment && {
+			if in_inline_comment && {if let Some(ref curr_expr) = curr_expr{
 				//if the last two chars == "*/" note the check is flipped as that is the order the itterator works
-				let mut chars = curr_expr.chars();
+				let mut chars = curr_expr.0.chars();
 				chars.next_back() == Some('/') && chars.next_back() == Some('*')
-			}{
+			}else{false}}{
 				in_inline_comment=false;
-				curr_expr=String::new();
-				curr_expr_pos=None;
+				curr_expr=None;
 			}
 			if in_comment || in_inline_comment{
-				curr_expr+=&chr.to_string();
+				if let Some(ref mut curr_expr) = curr_expr{
+					curr_expr.0+=&chr.to_string();
+				}else{curr_expr = Some((chr.to_string(),pos.clone()))}
 				continue;
 			}
 
@@ -490,8 +607,7 @@ impl Interpreter{
 			{
 				in_inline_comment = true;
 				tokens.pop();
-				curr_expr=String::new();
-				curr_expr_pos = None;
+				curr_expr=None;
 			}else if
 				chr == '/' &&
 				tokens.last() == Some(&Token{
@@ -501,13 +617,10 @@ impl Interpreter{
 			{
 				in_comment = true;
 				tokens.pop();
-				curr_expr = String::new();
-				curr_expr_pos = None;
+				curr_expr = None;
 			}else if is_expr_char(&chr){
-				if curr_expr.len()>0{
-					tokens.push(Token{content: curr_expr, pos: curr_expr_pos.unwrap(),});
-					curr_expr=String::new();
-					curr_expr_pos = None;
+				if let Some(curr_expr) = curr_expr.take(){// take sets to None
+					tokens.push(Token{content: curr_expr.0, pos: curr_expr.1,});
 				}
 				if is_double_char(&chr) && tokens.last() == Some(&Token{
 					content: chr.to_string(),
@@ -521,31 +634,27 @@ impl Interpreter{
 					}else{false}
 				{tokens.last_mut().unwrap().content += &chr.to_string();} else{
 					tokens.push(Token{content: chr.to_string(), pos: pos.clone(),});
-					curr_expr=String::new();
-					curr_expr_pos = None;
+					curr_expr = None;
 				}
 			}else if is_white_space_char(&chr){
-				if curr_expr.len()>0 {
-					tokens.push(Token{content: curr_expr, pos: curr_expr_pos.unwrap(),});
-					curr_expr=String::new();
-					curr_expr_pos = None;
+				if let Some(curr_expr) = curr_expr.take(){// take sets to None
+					tokens.push(Token{content: curr_expr.0, pos: curr_expr.1,});
 				}
 			}else{
-				if
-					let Some(first_chr) = curr_expr.chars().next()
-					&& is_number(&first_chr)
+				if let Some(curr_expr) = curr_expr.take_if(|curr_expr|
+					is_number(&if let Some(chr) = curr_expr.0.chars().next(){chr}else{panic!("curr_expr.1 should never be empty")})
 					&& is_letter(&chr)
-				{
-					tokens.push(Token{content: curr_expr, pos: curr_expr_pos.unwrap(),});
-					curr_expr=String::new();
-					curr_expr_pos = None;
-				}
-				if curr_expr_pos==None { curr_expr_pos=Some(pos.clone()); }
-				curr_expr+=&chr.to_string()
+				){tokens.push(Token{
+					content: curr_expr.0,
+					pos: curr_expr.1,
+				});};
+				if let Some(ref mut curr_expr) = curr_expr{
+					curr_expr.0+=&chr.to_string();
+				}else{curr_expr = Some((chr.to_string(),pos.clone()))}
 			}
 		}
-		if curr_expr.len()>0 && !in_comment && !in_inline_comment{
-			tokens.push(Token{content: curr_expr, pos: curr_expr_pos.unwrap(),});
+		if let Some(curr_expr) = curr_expr.take() && !in_comment && !in_inline_comment{
+			tokens.push(Token{content: curr_expr.0, pos: curr_expr.1,});
 		}
 		self.tokens = Some(tokens);
 		return Ok(());
@@ -556,7 +665,7 @@ impl Interpreter{
 		};
 
 		let mut token_gen = peek_nth(tokens.iter());
-		let root =  RootExpr::parse(&mut token_gen);
+		let _root =  RootExpr::parse(&mut token_gen);
 		todo!();//"{:#?}, {:#?}",token_gen, root);
 
 	}
