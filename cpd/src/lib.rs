@@ -185,15 +185,20 @@ enum OuterDef{
 		range: Range,
 	},
 	Peice{
+		name: String,
 		moves:List<Move>,
 		events: List<Event>,
-		checkable: bool,
-		value: usize,
+		checkable: Data,
+		value: Data,
 		range: Range,
 	},
 }
 
 macro_rules! properties {($token_gen:expr, $first_token: expr, $constructor: path, {$($prop: ident => $parse: expr;)*}) => {{
+	let Some(name_token) = $token_gen.next()else{return Err("expected a name however reached the end of the file".into())};
+	if !is_letter(&name_token.content.chars().next().expect("the lexer shouldnt emit empty token")){
+		return Err(UserMessage::new("expected the name to be made up of characters", name_token));
+	}
 	$(
 		let mut $prop = None;
 	)?
@@ -216,6 +221,7 @@ macro_rules! properties {($token_gen:expr, $first_token: expr, $constructor: pat
 		let Some($prop) = $prop else{return Err(UserMessage::new(format!("expected the property {} in the definition.",stringify!($prop)),range));};
 	)?
 	$constructor{
+		name: name_token.content.clone(),
 		$(
 			$prop,
 		)?
@@ -228,32 +234,25 @@ impl Parse for OuterDef{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=
 	let Some(kind_token) = token_gen.next() else{return Err("expected a definition type however reached the end of the file".into())};
 	return Ok(match kind_token.content.as_str(){
 		"#"=>properties!(token_gen, first_token, OuterDef::Colour, {
-			name=>{
-				let Some(token) = token_gen.next()else{return Err("expected a name however reached the end of the file".into())};
-				if !is_letter(&token.content.chars().next().expect("the lexer shouldnt emit empty token")){
-					return Err(UserMessage::new("expected the name to be made up of characters", token));
-				}
-				token.content.clone()
-			};
 			direction=>Data::parse(token_gen)?;
 		}),
 		"@"=>properties!(token_gen, first_token, OuterDef::Peice, {
 			moves=>List::parse(token_gen)?;
 			events=>List::parse(token_gen)?;
-			checkable=>todo!();
-			value=>todo!();
+			checkable=>Data::parse(token_gen)?;
+			value=>Data::parse(token_gen)?;
 		}),
 		v=>{return Err(UserMessage::new(format!("invalid type of definition `{}` the valid types are `#` or `@`",v),kind_token));}
 	});
 }}
 impl Ranged for OuterDef{
 	fn get_range(&self)->&Range {match self{
-		OuterDef::Colour { name:_, direction:_, range } |
-		OuterDef::Peice { moves:_, events:_, checkable:_, value:_, range } => range,
+		OuterDef::Colour { range, .. } |
+		OuterDef::Peice { range, .. } => range,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
-		OuterDef::Colour { name:_, direction:_, ref mut range } |
-		OuterDef::Peice { moves:_, events:_, checkable:_, value:_, ref mut range } => *range = setter(&range),
+		OuterDef::Colour { ref mut range, .. } |
+		OuterDef::Peice { ref mut range, .. } => *range = setter(&range),
 	}}
 }
 
@@ -520,9 +519,16 @@ impl<T:Parse+Ranged> List<T>{
 impl<T:Parse+Ranged> Parse for List<T>{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage>{
 	let Some(first_token) = token_gen.next() else{return Err("expected a list however the file ended".into())};
 	if first_token.content != "["{return Err(UserMessage::new(format!("expected a list however got `{}` to start a list use the `[` token", first_token.content), Range::from_token(first_token)))}
-	loop{
-
-	}
+	let mut data = Vec::new();
+	let last_token = loop{
+		let Some(token) = token_gen.peek() else{return Err(UserMessage::new("mismatched `[` expected a closing tag for the opening square bracket.", first_token.pos))};
+		if token.content == "]"{break token_gen.next().expect("peek failed");}
+		data.push(T::parse(token_gen)?);
+		let Some(token) = token_gen.next() else{return Err(UserMessage::new("mismatched `[` expected a closing tag for the opening square bracket.", first_token.pos))};
+		if token.content == "]"{break token;}
+		if token.content != ","{return Err(UserMessage::new(format!("expected a comma (`,`) to continue the list or closing bracket (`]`) to end it, however got `{}`", token.content),token))}
+	};
+	return Ok(Self{data, range:Range::from_first_last_token(first_token, last_token)})
 }}
 impl<T:Parse+Ranged> Ranged for List<T>{
 	fn get_range(&self)->&Range {&self.range}
@@ -665,9 +671,11 @@ impl Interpreter{
 		};
 
 		let mut token_gen = peek_nth(tokens.iter());
-		let _root =  RootExpr::parse(&mut token_gen);
-		todo!();//"{:#?}, {:#?}",token_gen, root);
-
+		let root = RootExpr::parse(&mut token_gen);
+		match root{
+			Ok(root) => todo!("{:#?}",root),
+			Err(err) => todo!("{:#?}\n{}",token_gen, err.error_string(&self, None)),
+		}
 	}
 	pub fn get_debug(&self)->String{format!("{:#?}",self)}
 	fn pretty_print_pos(&self, pos: &Pos)->String{format!("{}:{}:{}", self.filename, pos.line, pos.chr)}

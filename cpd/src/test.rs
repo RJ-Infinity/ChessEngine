@@ -1,6 +1,6 @@
 const CPD_DATA: &str = include_str!("../../standard.cpd");
 
-use crate::{Data, Expresion, Interpreter, OuterDef, Parse, Pos, Range, Token, Variable};
+use crate::{Data, Expresion, Interpreter, List, OuterDef, Parse, Pos, Range, Token, Variable};
 use itertools::peek_nth;
 
 #[test]
@@ -109,6 +109,20 @@ fn lexer(){
 		Token{content: "test0test".to_string(), pos: Pos{line: 1, chr: 13}},
 		Token{content: "12345".to_string(), pos: Pos{line: 1, chr: 23}},
 	]));
+	assert_eq!(lex_str!("="),Some(vec![Token{content: "=".to_string(), pos: Pos::new(1, 1)},]));
+	// +/-
+	assert_eq!(lex_str!("+/- + / - +/ - + /-"),Some(vec![
+		Token{content: "+/-".to_string(), pos: Pos{line: 1, chr: 1}},
+		Token{content: "+".to_string(), pos: Pos{line: 1, chr: 5}},
+		Token{content: "/".to_string(), pos: Pos{line: 1, chr: 7}},
+		Token{content: "-".to_string(), pos: Pos{line: 1, chr: 9}},
+		Token{content: "+".to_string(), pos: Pos{line: 1, chr: 11}},
+		Token{content: "/".to_string(), pos: Pos{line: 1, chr: 12}},
+		Token{content: "-".to_string(), pos: Pos{line: 1, chr: 14}},
+		Token{content: "+".to_string(), pos: Pos{line: 1, chr: 16}},
+		Token{content: "/".to_string(), pos: Pos{line: 1, chr: 18}},
+		Token{content: "-".to_string(), pos: Pos{line: 1, chr: 19}}
+	]));
 }
 
 macro_rules! get_token_gen{($data: literal) =>{{
@@ -160,31 +174,16 @@ fn expresion_parser(){
 #[test]
 fn outer_def_parser(){
 	assert_eq!(
-		OuterDef::parse(get_token_gen!("<# name=white direction=forwards>")),
+		OuterDef::parse(get_token_gen!("<#white direction=forwards>")),
 		Ok(OuterDef::Colour{
 			name: "white".to_string(),
 			direction: Data::Variable(Variable{
 				route: vec!["forwards".to_string()],
-				range: Range{start: Pos{line: 1, chr: 25}, end: Pos{line: 1, chr: 32}}
-			},Range{start: Pos{line: 1, chr: 25}, end: Pos{line: 1, chr: 32}}),
-			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 33}}
-		})
+				range: Range{start: Pos{line: 1, chr: 19}, end: Pos{line: 1, chr: 26}}
+			}, Range{start: Pos{line: 1, chr: 19}, end: Pos{line: 1, chr: 26}}),
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 27}}}
+		)
 	);
-	assert_eq!(
-		Expresion::parse(
-			Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
-			get_token_gen!(" /9")
-		),
-		Ok(Ok(Expresion::Division(
-			Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
-			Data::Value(9, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
-			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 3}}
-		)))
-	);
-	assert!(Expresion::parse(
-		Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
-		get_token_gen!(" asdf")
-	).is_err());
 }
 #[test]
 fn data_parser(){
@@ -214,5 +213,61 @@ fn data_parser(){
 			)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}),
 			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}
 		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}))
+	);
+	assert_eq!(
+		Data::parse(get_token_gen!("(1+2)/(4)")),
+		Ok(Data::Expresion(Box::new(Expresion::Division(
+			Data::Expresion(Box::new(Expresion::BinaryAddition(
+				Data::Value(1, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
+				Data::Value(2, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
+				Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}}
+			)), Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}}),
+			Data::Value(4, Range{start: Pos{line: 1, chr: 8}, end: Pos{line: 1, chr: 8}}),
+			Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 8}}
+		)), Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 8}}))
+	)
+}
+#[test]
+fn list_parser(){
+	assert_eq!(
+		List::<Data>::parse(get_token_gen!("[(1+2)/(4), 1,2,3, testing.theis, thisn]")),
+		Ok(List{
+			data: vec![
+				Data::Expresion(Box::new(Expresion::Division(
+					Data::Expresion(Box::new(Expresion::BinaryAddition(
+						Data::Value(1, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+						Data::Value(2, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
+						Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
+					)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
+					Data::Value(4, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+					Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}
+				)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}),
+				Data::Value(1, Range{start: Pos{line: 1, chr: 13}, end: Pos{line: 1, chr: 13}}),
+				Data::Value(2, Range{start: Pos{line: 1, chr: 15}, end: Pos{line: 1, chr: 15}}),
+				Data::Value(3, Range{start: Pos{line: 1, chr: 17}, end: Pos{line: 1, chr: 17}}),
+				Data::Variable(Variable{
+					route: vec!["testing".to_string(), "theis".to_string()],
+					range: Range{start: Pos{line: 1, chr: 20}, end: Pos{line: 1, chr: 32}}
+				}, Range{start: Pos{line: 1, chr: 20}, end: Pos{line: 1, chr: 32}}),
+				Data::Variable(Variable{
+					route: vec!["thisn".to_string()],
+					range: Range{start: Pos{line: 1, chr: 35}, end: Pos{line: 1, chr: 39}}
+				}, Range{start: Pos{line: 1, chr: 35}, end: Pos{line: 1, chr: 39}})
+			],range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 40}}
+		})
+	);
+	assert_eq!(
+		List::<Data>::parse(get_token_gen!("[]")),
+		Ok(List{
+			data:Vec::new(),
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
+		})
+	);
+	assert_eq!(
+		List::<Data>::parse(get_token_gen!("[123]")),
+		Ok(List{
+			data:vec![Data::Value(123, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}})],
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 5}}
+		})
 	);
 }
