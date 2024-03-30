@@ -1,6 +1,6 @@
 const CPD_DATA: &str = include_str!("../../standard.cpd");
 
-use crate::{Data, Expresion, Interpreter, List, OuterDef, Parse, Pos, Range, Token, Variable};
+use crate::{Data, Expresion, Interpreter, List, OuterDef, Parse, Pos, Range, Token, Variable, Vector};
 use itertools::peek_nth;
 
 #[test]
@@ -195,6 +195,13 @@ fn data_parser(){
 		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}))
 	);
 	assert_eq!(
+		Data::parse(get_token_gen!("+/-1")),
+		Ok(Data::Expresion(Box::new(Expresion::UnaryPlusMinus(
+			Data::Value(1, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
+			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}
+		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}))
+	);
+	assert_eq!(
 		Data::parse(get_token_gen!("1+2/3-4*5")),
 		Ok(Data::Expresion(Box::new(Expresion::BinaryAddition(
 			Data::Value(1, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}),
@@ -268,6 +275,29 @@ fn list_parser(){
 		Ok(List{
 			data:vec![Data::Value(123, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}})],
 			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 5}}
+		})
+	);
+}
+#[test]
+fn vector_parser(){
+	assert_eq!(
+		Vector::parse(get_token_gen!("{2, 2}")),
+		Ok(Vector{
+			x: Data::Value(2, Range::from_pos(Pos::new(1,2))),
+			y: Data::Value(2, Range::from_pos(Pos::new(1,5))),
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 6}}
+		})
+	);
+	assert_eq!(
+		Vector::parse(get_token_gen!("{(2+2), 2}")),
+		Ok(Vector{
+			x: Data::Expresion(Box::new(Expresion::BinaryAddition(
+				Data::Value(2, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+				Data::Value(2, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
+				Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
+			)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
+			y: Data::Value(2, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 10}}
 		})
 	);
 }

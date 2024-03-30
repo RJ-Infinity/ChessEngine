@@ -1,5 +1,6 @@
 #![feature(let_chains)]
 #![feature(option_take_if)]
+#![feature(get_many_mut)]
 
 use std::ops::{Add, Sub};
 use itertools::{PeekNth, peek_nth};
@@ -291,6 +292,7 @@ impl Ranged for Event{
 enum Expresion{
 	UnaryAddition(Data, Range),
 	UnarySubtraction(Data, Range),
+	UnaryPlusMinus(Data, Range),
 	BinaryAddition(Data, Data, Range),
 	BinarySubtraction(Data, Data, Range),
 	Multipication(Data, Data, Range),
@@ -377,7 +379,8 @@ impl Expresion{
 		let mut unary_tokens = vec!();
 		while let Some(token) = token_gen.next_if(|t|
 			t.content == "-" ||
-			t.content == "+"
+			t.content == "+" ||
+			t.content == "+/-"
 		){unary_tokens.push(token);}
 
 		let mut rv: Option<Self> = None;
@@ -396,6 +399,7 @@ impl Expresion{
 			rv = Some(match token.content.as_str(){
 				"-"=>Expresion::UnarySubtraction,
 				"+"=>Expresion::UnaryAddition,
+				"+/-"=>Expresion::UnaryPlusMinus,
 				_=>panic!("this is handled at the begining of the function")
 			}(base, range));
 		}
@@ -406,6 +410,7 @@ impl Ranged for Expresion{
 	fn get_range(&self)->&Range{match self{
 		Expresion::UnaryAddition(_, r) |
 		Expresion::UnarySubtraction(_, r) |
+		Expresion::UnaryPlusMinus(_, r) |
 		Expresion::BinaryAddition(_, _, r) |
 		Expresion::BinarySubtraction(_, _, r) |
 		Expresion::Multipication(_, _, r) |
@@ -414,6 +419,7 @@ impl Ranged for Expresion{
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
 		Expresion::UnaryAddition(_, ref mut r) |
 		Expresion::UnarySubtraction(_, ref mut r) |
+		Expresion::UnaryPlusMinus(_, ref mut r) |
 		Expresion::BinaryAddition(_, _, ref mut r) |
 		Expresion::BinarySubtraction(_, _, ref mut r) |
 		Expresion::Multipication(_, _, ref mut r) |
@@ -450,6 +456,7 @@ enum Data{
 	Expresion(Box<Expresion>, Range),
 	Value(isize, Range),
 	Variable(Variable, Range),
+	Vector(Box<Vector>, Range),
 }
 impl Data{
 	/// this can acctualy include an expr but only when it is contained within brackets
@@ -467,13 +474,17 @@ impl Data{
 		let Some(first_char) = first_token.content.chars().next() else{panic!("lexer shouldnt emit empty tokens")};
 		if is_letter(&first_char){
 			let var = Variable::parse(token_gen)?;
-			let range = var.range;
+			let range = *var.get_range();
 			return Ok(Data::Variable(var,range));
 		}else if is_number(&first_char){
 			let first_token = token_gen.next().expect("peek failed");
 			return Ok(Data::Value(first_token.content.parse().map_err(
 				|_|UserMessage::new(format!("Failed to parse int {}",first_token.content), Range::from_token(first_token))
 			)?, Range::from_first_last_token(first_token, first_token)))
+		}else if first_char == '{'{
+			let var = Vector::parse(token_gen)?;
+			let range = *var.get_range();
+			return Ok(Data::Vector(Box::new(var),range));
 		}
 		return Err(UserMessage::new(format!("Expected data however got `{}` try putting a number literal, mathmatical expresion or a variable reference",first_token.content),*first_token))
 	}
@@ -499,11 +510,13 @@ impl Ranged for Data{
 	fn get_range(&self)->&Range{match self{
 		Data::Expresion(_, r) |
 		Data::Value(_, r) |
+		Data::Vector(_, r) |
 		Data::Variable(_, r) => r,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
 		Data::Expresion(_, ref mut r) |
 		Data::Value(_, ref mut r) |
+		Data::Vector(_, ref mut r) |
 		Data::Variable(_, ref mut r) => *r = setter(&r),
 	}}
 }
@@ -534,6 +547,31 @@ impl<T:Parse+Ranged> Ranged for List<T>{
 	fn get_range(&self)->&Range {&self.range}
 	fn set_range<Fn:FnOnce(&Range)->Range>(&mut self, setter: Fn) {self.range = setter(&self.range)}
 }
+
+#[derive(Debug, PartialEq)]
+struct Vector{
+	x: Data,
+	y: Data,
+	range: Range,
+}
+impl Parse for Vector{
+	fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Result<Self, UserMessage> where Self: Sized {
+		let Some(first_token) = token_gen.next() else{return Err("expected a vector however the file ended".into())};
+		if first_token.content != "{"{return Err(UserMessage::new(format!("expected a vector however got `{}` to start a vector use the `{{` token", first_token.content), Range::from_token(first_token)))}
+		let x = Data::parse(token_gen)?;
+		let Some(token) = token_gen.next() else{return Err(UserMessage::new("mismatched `{{` expected a closing tag for the opening curly bracket.", first_token.pos))};
+		if token.content != ","{return Err(UserMessage::new(format!("expected a comma (`,`) to to seperate the x and y components however got `{}`", token.content),token))}
+		let y = Data::parse(token_gen)?;
+		let Some(token) = token_gen.next() else{return Err(UserMessage::new("mismatched `{{` expected a closing tag for the opening curly bracket.", first_token.pos))};
+		if token.content != "}"{return Err(UserMessage::new(format!("expected a closing curly bracket as a vector can only be 2d however got `{}`", token.content),token))}
+		return Ok(Self{x, y, range: Range::from_first_last_token(first_token, token)})
+	}
+}
+impl Ranged for Vector{
+	fn get_range(&self)->&Range {&self.range}
+	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {self.range = setter(&self.range);}
+}
+
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Interpreter{
@@ -628,17 +666,36 @@ impl Interpreter{
 				if let Some(curr_expr) = curr_expr.take(){// take sets to None
 					tokens.push(Token{content: curr_expr.0, pos: curr_expr.1,});
 				}
-				if is_double_char(&chr) && tokens.last() == Some(&Token{
-					content: chr.to_string(),
-					pos: Pos::new(pos.line, pos.chr-1)
-				}) {tokens.last_mut().unwrap().content += &chr.to_string()}
-				else if
-					chr=='=' && if let Some(last) = tokens.last(){
-						last.content.chars().count() == 1 &&
-						is_equal_type(&last.content.chars().next().unwrap()) &&
-						last.pos == (Pos::new(pos.line, pos.chr-1))
-					}else{false}
-				{tokens.last_mut().unwrap().content += &chr.to_string();} else{
+				let len = tokens.len();
+				if
+					chr == '-'
+					&& len >= 2
+					&& let Ok([plus, slash]) = tokens.get_many_mut([len-2, len-1])
+					&& plus == (&mut Token{
+						content: "+".to_string(),
+						pos: Pos::new(pos.line, pos.chr-2),
+					})
+					&& slash == (&Token{
+						content: "/".to_string(),
+						pos: Pos::new(pos.line, pos.chr-1),
+					})
+				{
+					plus.content += "/-";
+					tokens.pop();
+				}else if
+					is_double_char(&chr)
+					&& let Some(last_t) = tokens.last_mut()
+					&& last_t == (&mut Token{
+						content: chr.to_string(),
+						pos: Pos::new(pos.line, pos.chr-1)
+					})
+				{last_t.content += &chr.to_string()} else if
+					chr=='='
+					&& let Some(last) = tokens.last_mut()
+					&& last.content.chars().count() == 1
+					&& is_equal_type(&last.content.chars().next().unwrap())
+					&& last.pos == (Pos::new(pos.line, pos.chr-1))
+				{last.content += &chr.to_string();} else{
 					tokens.push(Token{content: chr.to_string(), pos: pos.clone(),});
 					curr_expr = None;
 				}
