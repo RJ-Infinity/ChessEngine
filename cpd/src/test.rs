@@ -131,41 +131,46 @@ macro_rules! get_token_gen{($data: literal) =>{{
 	int.lexer().unwrap();
 	&mut peek_nth(int.tokens.unwrap().iter())
 }};}
+macro_rules! assert_parse {($parser: expr, $data: literal, $expected: expr) => {{
+	let mut int = Interpreter::new("<test>".to_string());
+	int.data = Some($data.to_string());
+	int.lexer().unwrap();
+	let tokens = int.tokens.unwrap();
+	let mut token_gen = &mut peek_nth(tokens.iter());
+	assert_eq!($parser(&mut token_gen), $expected);
+	assert_eq!(token_gen.next(), None, "not all tokens consumed after parsing");
+}};}
 #[test]
 fn variable_parser(){
-	assert_eq!(Variable::parse(get_token_gen!("test")),Ok(Variable{
+	assert_parse!(Variable::parse, "test", Ok(Variable{
 		route: vec!["test".to_string()],
 		range: Range{start: Pos::new(1,1), end: Pos::new(1,4)}
 	}));
-	assert_eq!(Variable::parse(get_token_gen!("test.second")),Ok(Variable{
+	assert_parse!(Variable::parse, "test.second", Ok(Variable{
 		route: vec!["test".to_string(),"second".to_string()],
 		range: Range{start: Pos::new(1,1), end: Pos::new(1,11)}
 	}));
-	assert_eq!(Variable::parse(get_token_gen!("test.second.third")),Ok(Variable{
+	assert_parse!(Variable::parse, "test.second.third", Ok(Variable{
 		route: vec!["test".to_string(),"second".to_string(),"third".to_string(),],
 		range: Range{start: Pos::new(1,1), end: Pos::new(1,17)}
 	}));
 }
 #[test]
 fn expresion_parser(){
-	assert_eq!(
-		Expresion::parse_unary(get_token_gen!("-1")),
-		Some(Ok(Expresion::UnarySubtraction(
-			Data::Value(1, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
-			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
-		)))
-	);
-	assert_eq!(
-		Expresion::parse(
-			Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
-			get_token_gen!(" /9")
-		),
-		Ok(Ok(Expresion::Division(
-			Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
-			Data::Value(9, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
-			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 3}}
-		)))
-	);
+	assert_parse!(Expresion::parse_unary, "-1", Some(Ok(Expresion::UnarySubtraction(
+		Data::Value(1, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
+	))));
+
+	assert_parse!(|tg|Expresion::parse(
+		Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+		tg
+	), " /9", Ok(Ok(Expresion::Division(
+		Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+		Data::Value(9, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 3}}
+	))));
+
 	assert!(Expresion::parse(
 		Data::Value(0, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
 		get_token_gen!(" asdf")
@@ -173,131 +178,101 @@ fn expresion_parser(){
 }
 #[test]
 fn outer_def_parser(){
-	assert_eq!(
-		OuterDef::parse(get_token_gen!("<#white direction=forwards>")),
-		Ok(OuterDef::Colour{
-			name: "white".to_string(),
-			direction: Data::Variable(Variable{
-				route: vec!["forwards".to_string()],
-				range: Range{start: Pos{line: 1, chr: 19}, end: Pos{line: 1, chr: 26}}
-			}, Range{start: Pos{line: 1, chr: 19}, end: Pos{line: 1, chr: 26}}),
-			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 27}}}
-		)
-	);
+	assert_parse!(OuterDef::parse, "<#white direction=forwards>", Ok(OuterDef::Colour{
+		name: "white".to_string(),
+		direction: Data::Variable(Variable{
+			route: vec!["forwards".to_string()],
+			range: Range{start: Pos{line: 1, chr: 19}, end: Pos{line: 1, chr: 26}}
+		}, Range{start: Pos{line: 1, chr: 19}, end: Pos{line: 1, chr: 26}}),
+		range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 27}}}
+	));
 }
 #[test]
 fn data_parser(){
-	assert_eq!(
-		Data::parse(get_token_gen!("-1")),
-		Ok(Data::Expresion(Box::new(Expresion::UnarySubtraction(
-			Data::Value(1, Range{start: Pos{line: 1, chr: 2},end: Pos{line: 1, chr: 2}}),
-			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
-		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}))
-	);
-	assert_eq!(
-		Data::parse(get_token_gen!("+/-1")),
-		Ok(Data::Expresion(Box::new(Expresion::UnaryPlusMinus(
-			Data::Value(1, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
-			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}
-		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}))
-	);
-	assert_eq!(
-		Data::parse(get_token_gen!("1+2/3-4*5")),
-		Ok(Data::Expresion(Box::new(Expresion::BinaryAddition(
-			Data::Value(1, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}),
-			Data::Expresion(Box::new(Expresion::BinarySubtraction(
-				Data::Expresion(Box::new(Expresion::Division(
-					Data::Value(2, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
-					Data::Value(3, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
-					Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
-				)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
-				Data::Expresion(Box::new(Expresion::Multipication(
-					Data::Value(4, Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 7}}),
-					Data::Value(5, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
-					Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 9}}
-				)), Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 9}}),
-				Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}
-			)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}),
-			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}
-		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}))
-	);
-	assert_eq!(
-		Data::parse(get_token_gen!("(1+2)/(4)")),
-		Ok(Data::Expresion(Box::new(Expresion::Division(
-			Data::Expresion(Box::new(Expresion::BinaryAddition(
-				Data::Value(1, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
-				Data::Value(2, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
-				Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}}
-			)), Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}}),
-			Data::Value(4, Range{start: Pos{line: 1, chr: 8}, end: Pos{line: 1, chr: 8}}),
-			Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 8}}
-		)), Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 8}}))
-	)
+	assert_parse!(Data::parse, "-1", Ok(Data::Expresion(Box::new(Expresion::UnarySubtraction(
+		Data::Value(1, Range{start: Pos{line: 1, chr: 2},end: Pos{line: 1, chr: 2}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}})));
+	assert_parse!(Data::parse, "+/-1", Ok(Data::Expresion(Box::new(Expresion::UnaryPlusMinus(
+		Data::Value(1, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}})));
+	assert_parse!(Data::parse, "1+2/3-4*5", Ok(Data::Expresion(Box::new(Expresion::BinaryAddition(
+		Data::Value(1, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}),
+		Data::Expresion(Box::new(Expresion::BinarySubtraction(
+			Data::Expresion(Box::new(Expresion::Division(
+				Data::Value(2, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+				Data::Value(3, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
+				Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
+			)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
+			Data::Expresion(Box::new(Expresion::Multipication(
+				Data::Value(4, Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 7}}),
+				Data::Value(5, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+				Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 9}}
+			)), Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 9}}),
+			Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}
+		)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}})));
+	assert_parse!(Data::parse, "(1+2)/(4)", Ok(Data::Expresion(Box::new(Expresion::Division(
+		Data::Expresion(Box::new(Expresion::BinaryAddition(
+			Data::Value(1, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
+			Data::Value(2, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
+			Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}}
+		)), Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}}),
+		Data::Value(4, Range{start: Pos{line: 1, chr: 8}, end: Pos{line: 1, chr: 8}}),
+		Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 8}}
+	)), Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 8}})));
 }
 #[test]
 fn list_parser(){
-	assert_eq!(
-		List::<Data>::parse(get_token_gen!("[(1+2)/(4), 1,2,3, testing.theis, thisn]")),
-		Ok(List{
-			data: vec![
-				Data::Expresion(Box::new(Expresion::Division(
-					Data::Expresion(Box::new(Expresion::BinaryAddition(
-						Data::Value(1, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
-						Data::Value(2, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
-						Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
-					)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
-					Data::Value(4, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
-					Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}
-				)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}),
-				Data::Value(1, Range{start: Pos{line: 1, chr: 13}, end: Pos{line: 1, chr: 13}}),
-				Data::Value(2, Range{start: Pos{line: 1, chr: 15}, end: Pos{line: 1, chr: 15}}),
-				Data::Value(3, Range{start: Pos{line: 1, chr: 17}, end: Pos{line: 1, chr: 17}}),
-				Data::Variable(Variable{
-					route: vec!["testing".to_string(), "theis".to_string()],
-					range: Range{start: Pos{line: 1, chr: 20}, end: Pos{line: 1, chr: 32}}
-				}, Range{start: Pos{line: 1, chr: 20}, end: Pos{line: 1, chr: 32}}),
-				Data::Variable(Variable{
-					route: vec!["thisn".to_string()],
-					range: Range{start: Pos{line: 1, chr: 35}, end: Pos{line: 1, chr: 39}}
-				}, Range{start: Pos{line: 1, chr: 35}, end: Pos{line: 1, chr: 39}})
-			],range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 40}}
-		})
-	);
-	assert_eq!(
-		List::<Data>::parse(get_token_gen!("[]")),
-		Ok(List{
-			data:Vec::new(),
-			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
-		})
-	);
-	assert_eq!(
-		List::<Data>::parse(get_token_gen!("[123]")),
-		Ok(List{
-			data:vec![Data::Value(123, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}})],
-			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 5}}
-		})
-	);
+	assert_parse!(List::<Data>::parse, "[(1+2)/(4), 1,2,3, testing.theis, thisn]", Ok(List{
+		data: vec![
+			Data::Expresion(Box::new(Expresion::Division(
+				Data::Expresion(Box::new(Expresion::BinaryAddition(
+					Data::Value(1, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+					Data::Value(2, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
+					Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
+				)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
+				Data::Value(4, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+				Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}
+			)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 9}}),
+			Data::Value(1, Range{start: Pos{line: 1, chr: 13}, end: Pos{line: 1, chr: 13}}),
+			Data::Value(2, Range{start: Pos{line: 1, chr: 15}, end: Pos{line: 1, chr: 15}}),
+			Data::Value(3, Range{start: Pos{line: 1, chr: 17}, end: Pos{line: 1, chr: 17}}),
+			Data::Variable(Variable{
+				route: vec!["testing".to_string(), "theis".to_string()],
+				range: Range{start: Pos{line: 1, chr: 20}, end: Pos{line: 1, chr: 32}}
+			}, Range{start: Pos{line: 1, chr: 20}, end: Pos{line: 1, chr: 32}}),
+			Data::Variable(Variable{
+				route: vec!["thisn".to_string()],
+				range: Range{start: Pos{line: 1, chr: 35}, end: Pos{line: 1, chr: 39}}
+			}, Range{start: Pos{line: 1, chr: 35}, end: Pos{line: 1, chr: 39}})
+		],range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 40}}
+	}));
+	assert_parse!(List::<Data>::parse, "[]", Ok(List{
+		data:Vec::new(),
+		range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
+	}));
+	assert_parse!(List::<Data>::parse, "[123]", Ok(List{
+		data:vec![Data::Value(123, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 4}})],
+		range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 5}}
+	}));
 }
 #[test]
 fn vector_parser(){
-	assert_eq!(
-		Vector::parse(get_token_gen!("{2, 2}")),
-		Ok(Vector{
-			x: Data::Value(2, Range::from_pos(Pos::new(1,2))),
-			y: Data::Value(2, Range::from_pos(Pos::new(1,5))),
-			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 6}}
-		})
-	);
-	assert_eq!(
-		Vector::parse(get_token_gen!("{(2+2), 2}")),
-		Ok(Vector{
-			x: Data::Expresion(Box::new(Expresion::BinaryAddition(
-				Data::Value(2, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
-				Data::Value(2, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
-				Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
-			)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
-			y: Data::Value(2, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
-			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 10}}
-		})
-	);
+	assert_parse!(Vector::parse, "{2, 2}", Ok(Vector{
+		x: Data::Value(2, Range::from_pos(Pos::new(1,2))),
+		y: Data::Value(2, Range::from_pos(Pos::new(1,5))),
+		range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 6}}
+	}));
+	assert_parse!(Vector::parse, "{(2+2), 2}", Ok(Vector{
+		x: Data::Expresion(Box::new(Expresion::BinaryAddition(
+			Data::Value(2, Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 3}}),
+			Data::Value(2, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
+			Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}
+		)), Range{start: Pos{line: 1, chr: 3}, end: Pos{line: 1, chr: 5}}),
+		y: Data::Value(2, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+		range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 10}}
+	}));
 }
