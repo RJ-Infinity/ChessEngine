@@ -351,9 +351,7 @@ impl Expresion{
 		lhs: Data,
 		token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>
 	)->Result<Result<Self, UserMessage>, Data>{
-		let Some(op_token) = token_gen.peek()else{return Err(lhs);};
-		if !OOO.contains(&op_token.content.as_str()){return Err(lhs);}
-		let Some(op_token) = token_gen.next()else{panic!("peek failed")};
+		let Some(op_token) = token_gen.next_if(|t|OOO.contains(&t.content.as_str()))else{return Err(lhs);};
 
 		let rhs = match
 			if let Some(unary) = Data::parse_unary(token_gen){unary}else{Data::parse_without_expr(token_gen)}
@@ -363,10 +361,9 @@ impl Expresion{
 		let mut data = vec![lhs,rhs];
 
 		loop{
-			let Some(op_token) = token_gen.peek()else{break;};
-			if !OOO.contains(&op_token.content.as_str()){break;};
-			let Some(op_token) = token_gen.next()else{panic!("peek failed")};
-			operations.push(op_token);
+			operations.push(if let Some(op_token) = token_gen.next_if(
+				|op_token|OOO.contains(&op_token.content.as_str())
+			){op_token}else{break;});
 
 			data.push(match
 				if let Some(unary) = Data::parse_unary(token_gen){unary}else{Data::parse_without_expr(token_gen)}
@@ -377,11 +374,17 @@ impl Expresion{
 	}
 	fn parse_unary<'a>(token_gen: &mut PeekNth<impl Iterator<Item=&'a Token>>)->Option<Result<Self, UserMessage>>{
 		let mut unary_tokens = vec!();
-		while let Some(token) = token_gen.next_if(|t|
-			t.content == "-" ||
-			t.content == "+" ||
-			t.content == "+/-"
-		){unary_tokens.push(token);}
+		while let Some(token) = token_gen.peek(){
+			// here the compiler needs to know it is a dyn
+			let t: (Box<dyn Fn(_, _) -> _>, _) = match token.content.as_str(){
+				"-"=>(Box::new(Expresion::UnarySubtraction), token.pos),
+				"+"=>(Box::new(Expresion::UnaryAddition), token.pos),
+				"+/-"=>(Box::new(Expresion::UnaryPlusMinus), token.pos),
+				_=>break
+			};
+			token_gen.next();
+			unary_tokens.push(t);
+		}
 
 		let mut rv: Option<Self> = None;
 		for token in unary_tokens.iter().rev(){
@@ -394,14 +397,9 @@ impl Expresion{
 				}
 			};
 			let mut range = base.get_range().clone();
-			range.start = token.pos;
+			range.start = token.1;
 
-			rv = Some(match token.content.as_str(){
-				"-"=>Expresion::UnarySubtraction,
-				"+"=>Expresion::UnaryAddition,
-				"+/-"=>Expresion::UnaryPlusMinus,
-				_=>panic!("this is handled at the begining of the function")
-			}(base, range));
+			rv = Some(token.0(base, range));
 		}
 		return rv.map(|v|Ok(v));
 	}
@@ -439,9 +437,7 @@ impl Parse for Variable{fn parse<'a>(token_gen: &mut PeekNth<impl Iterator<Item=
 		let Some(first_char) = curr_token.content.chars().next()else{panic!("the lexer shoudnt emmit tokens with no length")};
 		if !is_letter(&first_char){return Err(UserMessage::new(format!("expected a variable however a variable cannot start with `{}`", first_char),curr_token))}
 		route.push(curr_token.content.clone());
-		let Some(sep) = token_gen.peek()else{break;};
-		if sep.content != "."{break;}
-		token_gen.next().expect("peek failed");
+		let Some(_) = token_gen.next_if(|sep|sep.content == ".")else{break;};
 		curr_token = match token_gen.next(){Some(v)=>v,None=>return Err("expected a variable path identifier after the `.` however reached the end of the file".into())};
 	}
 	Ok(Self{route, range: Range::from_first_last_token(first_token, curr_token)})
