@@ -133,7 +133,7 @@ macro_rules! get_token_gen{($data: literal) =>{{
 	let tokens = Box::new(peek_nth(Box::leak(tokens).iter()));
 	Box::leak(tokens)
 }};}
-macro_rules! assert_parse {($parser: expr, $data: literal, $expected: expr) => {{
+macro_rules! assert_parse{($parser: expr, $data: literal, $expected: expr) =>{{
 	let mut int = Interpreter::new("<test>".to_string());
 	int.data = Some($data.to_string());
 	int.lexer().unwrap();
@@ -277,4 +277,109 @@ fn vector_parser(){
 		y: Data::Value(2, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
 		range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 10}}
 	}));
+}
+#[test]
+fn bool_parser(){
+	assert_parse!(Data::parse, "true", Ok(Data::Bool(true, Range{start: Pos::new(1, 1), end: Pos::new(1, 4)})));
+	assert_parse!(Data::parse, "false", Ok(Data::Bool(false, Range{start: Pos::new(1, 1), end: Pos::new(1, 5)})));
+	assert_parse!(Data::parse, "a||b", Ok(Data::Expresion(
+		Box::new(Expresion::Or(
+			Data::Variable(Variable{
+				route: vec!["a".to_string()],
+				range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}
+			}, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}),
+			Data::Variable(Variable{
+				route: vec!["b".to_string()],
+				range: Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}
+			}, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
+			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}
+		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 4}}
+	)));
+	assert_parse!(Data::parse, "a||b&&c", Ok(Data::Expresion(Box::new(Expresion::Or(
+		Data::Variable(Variable{
+			route: vec!["a".to_string()],
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}
+		}, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}),
+		Data::Expresion(Box::new(Expresion::And(
+			Data::Variable(Variable{
+				route: vec!["b".to_string()],
+				range: Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}
+			}, Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 4}}),
+			Data::Variable(Variable{
+				route: vec!["c".to_string()],
+				range: Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 7}}
+			}, Range{start: Pos{line: 1, chr: 7}, end: Pos{line: 1, chr: 7}}),
+			Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 7}}
+		)),Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 7}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 7}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 7}})));
+	assert_parse!(Data::parse, "a||!b&&c", Ok(Data::Expresion(Box::new(Expresion::Or(
+		Data::Variable(Variable{
+			route: vec!["a".to_string()],
+			range: Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}
+		}, Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 1}}),
+		Data::Expresion(Box::new(Expresion::And(
+			Data::Expresion(Box::new(Expresion::Negation(
+				Data::Variable(Variable{
+					route: vec!["b".to_string()],
+					range: Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}
+				}, Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 5}}),
+				Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 5}}
+			)), Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 5}}),
+			Data::Variable(Variable{
+				route: vec!["c".to_string()],
+				range: Range{start: Pos{line: 1, chr: 8}, end: Pos{line: 1, chr: 8}}
+			}, Range{start: Pos{line: 1, chr: 8}, end: Pos{line: 1, chr: 8}}),
+			Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 8}}
+		)), Range{start: Pos{line: 1, chr: 4}, end: Pos{line: 1, chr: 8}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 8}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 8}})));
+	assert_parse!(Data::parse, "!a||!b&&c", Ok(Data::Expresion(Box::new(Expresion::Or(
+		Data::Expresion(Box::new(Expresion::Negation(
+			Data::Variable(Variable{
+				route: vec!["a".to_string()],
+				range: Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}
+			}, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
+			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
+		)),Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+		Data::Expresion(Box::new(Expresion::And(
+			Data::Expresion(Box::new(Expresion::Negation(
+				Data::Variable(Variable{
+					route: vec!["b".to_string()],
+					range: Range{start: Pos{line: 1, chr: 6}, end: Pos{line: 1, chr: 6}}
+				}, Range{start: Pos{line: 1, chr: 6}, end: Pos{line: 1, chr: 6}}),
+				Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 6}}
+			)), Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 6}}),
+			Data::Variable(Variable{
+				route: vec!["c".to_string()],
+				range: Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}
+			}, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+			Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 9}}
+		)), Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 9}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}})));
+	assert_parse!(Data::parse, "!a&&!b&&c", Ok(Data::Expresion(Box::new(Expresion::And(
+		Data::Expresion(Box::new(Expresion::Negation(
+			Data::Variable(Variable{
+				route: vec!["a".to_string()],
+				range: Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}
+			}, Range{start: Pos{line: 1, chr: 2}, end: Pos{line: 1, chr: 2}}),
+			Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}
+		)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 2}}),
+		Data::Expresion(Box::new(Expresion::And(
+			Data::Expresion(Box::new(Expresion::Negation(
+				Data::Variable(Variable{
+					route: vec!["b".to_string()],
+					range: Range{start: Pos{line: 1, chr: 6}, end: Pos{line: 1, chr: 6}}
+				}, Range{start: Pos{line: 1, chr: 6}, end: Pos{line: 1, chr: 6}}),
+				Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 6}}
+			)), Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 6}}),
+			Data::Variable(Variable{
+				route: vec!["c".to_string()],
+				range: Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}
+			}, Range{start: Pos{line: 1, chr: 9}, end: Pos{line: 1, chr: 9}}),
+			Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 9}}
+		)), Range{start: Pos{line: 1, chr: 5}, end: Pos{line: 1, chr: 9}}),
+		Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}}
+	)), Range{start: Pos{line: 1, chr: 1}, end: Pos{line: 1, chr: 9}})));
 }

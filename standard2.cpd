@@ -1,0 +1,177 @@
+// chess piece definition file
+<#white direction={0, 1}>
+<#black direction={0, -1}>
+<@knight
+	moves=[
+		+/-{1, 2},
+		+/-{2, 1},
+	]
+	value=3
+>
+<@king
+	moves=[
+		+/-{1, 0},
+		+/-{0, 1},
+		+/-{1, 1},
+		{2, 0}?(
+			board.getPiece(move)==null && // the sqare to move to is empty
+			board.getPiece(move - {1, 0}) == null && // the sqare it moves through is empty
+			!board.isAttacked(move - {1, 0}) && // the square it moves through is not attacked
+			!peice.inCheck() && // the peice is not in check
+			peice.moveCount==0 && // it has never moved before
+			board.getPiece(move + {1, 0}).moveCount==0 // the rook hasnt moved
+			!board.getPiece(move + {1, 0}).inCheck() // the rook isnt in check
+		)then{board.getPiece(move + {1, 0}).moveTo(move - {1, 0})},
+		{-2, 0}?(
+			board.getPiece(move)==null &&
+			board.getPiece(move + {1, 0}) == null &&
+			!board.isAttacked(move + {1, 0}) &&
+			!peice.inCheck() &&
+			peice.moveCount==0 &&
+			board.getPiece(move - {1, 0}).moveCount==0
+		)then{board.getPiece(move - {1, 0}).moveTo(move + {1, 0})}
+	]
+	checkable=true
+	events=($checkmate{colour.loose()})
+	value=0
+>
+<@pawn
+	moves=[
+		{0, 1}?{board.getPiece(move)==null},
+		{0, 2}?{
+			peice.moveCount==0 &&
+			board.getPiece(peice.pos + {0, 1})==null &&
+			board.getPiece(move)==null
+		},
+		{+/-1, 1}if{board.getPiece(move)!=null},
+		{-1, 1}if{board.getPiece(move)!=null},
+		{1, 1}if{
+			// there is no need for a check for an empty square as this must be the case
+			// for the other pawn to move 
+			board.getPiece(peice.pos+{})=="pawn" &&
+			board.getPiece(pos+1).colour!=colour &&
+			board.getPiece(pos+1).lastmove==board.getPiece(pos+1).colour.lastmove &&
+			board.getPiece(pos+1).lastmove.distance==board.getPiece(pos+1).colour.direction*2
+		}${colour.takePiece(pos+1)},
+		pos+colour.direction-1:{
+			board.getPiece(pos-1)=="pawn" &&
+			board.getPiece(pos+1).colour!=colour &&
+			board.getPiece(pos-1).lastmove==board.getPiece(pos-1).colour.lastmove &&
+			board.getPiece(pos-1).lastmove.distance==board.getPiece(pos-1).colour.direction*2
+		}${colour.takePiece(pos-1)},
+	]
+	//note division is integer only so these comparisons work
+	events=($move:{pos/board.width==0||pos/board.width==7}{
+		board.removePiece(pos)
+		board.setPiece(pos,colour.openSelectPiece(["queen","knight","rook","bishop"]),colour)
+	})
+	value=1
+>
+<@rook
+	moves=(
+		(
+			(i)(pos)Σ(pos-(pos%board.width)+1)//between pos and the leftmost but one square on that row
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-1}:{
+				£i>=pos-(pos%board.width) &&
+				board.getPiece(£i-1).colour!=colour
+			}
+		)+
+		(
+			(i)(pos)Σ(pos-(pos%board.width)+board.width-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+1}:{
+				£i<<pos-(pos-(pos%board.width)+board.width) &&
+				board.getPiece(£i+1).colour!=colour
+			}
+		)+
+		(
+			(i→(pos+£i*board.width))(0)Σ((board.length-board.width+(pos%board.width)-pos)/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width}:{board.getPiece(£i+board.width).colour!=colour}
+			//no bounds needed as it will just go out of bounds not overflow
+		)+
+		(
+			(i→(pos-£i*board.width))(0)Σ((pos-(pos%board.width))/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width}:{board.getPiece(£i-board.width).colour!=colour}
+		)
+	)
+	value=5
+>
+<@bishop
+	moves=(
+		(//top right
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width+1}:{board.getPiece(£i+board.width+1).colour!=colour}
+		)+
+		(//top left
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width-1}:{board.getPiece(£i+board.width-1).colour!=colour}
+		)+
+		(//bottom right
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width+1}:{board.getPiece(£i-board.width+1).colour!=colour}
+		)+
+		(//bottom left
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width-1}:{board.getPiece(£i-board.width-1).colour!=colour}
+		)
+	)
+	value=3
+>
+<@queen
+	moves=(
+		(//rook moves
+			(i)(pos)Σ(pos-(pos%board.width)+1)//between pos and the leftmost but one square on that row
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-1}:{
+				£i>=pos-(pos%board.width) &&
+				board.getPiece(£i-1).colour!=colour
+			}
+		)+
+		(
+			(i)(pos)Σ(pos-(pos%board.width)+board.width-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+1}:{
+				£i<<pos-(pos-(pos%board.width)+board.width) &&
+				board.getPiece(£i+1).colour!=colour
+			}
+		)+
+		(
+			(i→(pos+£i*board.width))(0)Σ((board.length-board.width+(pos%board.width)-pos)/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width}:{board.getPiece(£i+board.width).colour!=colour}
+		)+
+		(
+			(i→(pos-£i*board.width))(0)Σ((pos-(pos%board.width))/board.width)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width}:{board.getPiece(£i-board.width).colour!=colour}
+		)+
+		(//bishop moves
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width+1}:{board.getPiece(£i+board.width+1).colour!=colour}
+		)+
+		(
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i+board.width-1}:{board.getPiece(£i+board.width-1).colour!=colour}
+		)+
+		(
+			(i→(pos+£i*(board.width+1)))(0)Σ(board.width-(pos%board.width)-2)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width+1}:{board.getPiece(£i-board.width+1).colour!=colour}
+		)+
+		(
+			(i→(pos+£i*(board.width-1)))(0)Σ((pos%board.width)-1)
+			:{board.getPiece(£i)==null || board.getPiece(£i)==self}
+			{£i-board.width-1}:{board.getPiece(£i-board.width-1).colour!=colour}
+		)
+	)
+	value=9
+>

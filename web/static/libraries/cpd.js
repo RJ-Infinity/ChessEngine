@@ -756,75 +756,75 @@ export class CPDInterpreter{
 	}
 	prettyPrintPos=pos=>`${this.Filename}:${pos.line}:${pos.char}`
 }
-export class CPDExecutionContext{
-	_interpreter;
-	PeiceTypes=[];
-	_peiceDefinitions=[];
-	Colours=[];
-	_colourDefinitions=[];
-	constructor(interpreter, width){
-		if(interpreter.SyntaxTree === null){
-			throw "Execution Error: no interpreter data, Data must be added before execution context can initiate";
-		}
-		this._interpreter = interpreter;
-		interpreter.SyntaxTree.forEach(el=>{switch (el.type) {
-			case "PieceDefinition":{
-				this.PeiceTypes.push(el.name);
-				this._peiceDefinitions.push(el);
-			}break;
-			case "ColourDefinition":{
-				this.Colours.push(new CPDColour(this, el));
-				this._colourDefinitions.push(el);
-			}break;
-			default:{
-				throw "Execution Error: the roots of the syntax tree must be definition types";
-			}
-		}});
-	}
-}
-// class CPDMove{
-// 	distance;
-// 	from;
-// 	to;
-// }
-// function UNIMPLIMENTED(){console.error("ERROR function "+arguments.callee.caller.name+" not defined");} 
-// class CPDPeice{
-// 	pos;
-// 	board;
-// 	colour;
-// 	inCheck;
-// 	moveCount;
-// 	moveTo(pos){UNIMPLIMENTED()};
-// 	lastmove;
-// 	_peice;
-// 	constructor(ctx, peice, colour){
-// 		this._peice = peice;
-// 		this.colour = colour;
-// 	}
-// }
-// class CPDBoard{
-// 	width;
-// 	getPiece(pos){return this._board[pos];}
-// 	isAttacked(pos){UNIMPLIMENTED()};
-// 	removePiece(pos){this._board[pos]=null};
-// 	setPiece(pos,peice,colour){this._board[pos]=new CPDPeice(peice,colour)};
-// 	constructor(ctx, width){
-// 		this.width = width;
-// 		this._board = [...Array(width*width)];
-// 	}
-// 	_board = []
-// }
-// class CPDColour{
-// 	constructor(ctx, el){
-// 		this.colour = el.properties.find(p=>p.key==="name");
-// 		if (this.colour === undefined){
-// 			throw "Execution Error: colour is missing a name at "+ctx._interpreter.prettyPrintPos(el.pos);
+// export class CPDExecutionContext{
+// 	_interpreter;
+// 	PeiceTypes=[];
+// 	_peiceDefinitions=[];
+// 	Colours=[];
+// 	_colourDefinitions=[];
+// 	constructor(interpreter, width){
+// 		if(interpreter.SyntaxTree === null){
+// 			throw "Execution Error: no interpreter data, Data must be added before execution context can initiate";
 // 		}
-
-// 	};
-// 	loose(){UNIMPLIMENTED()};
-// 	direction;
-// 	takePiece(pos){UNIMPLIMENTED()};
-// 	openSelectPiece(peiceChoice){UNIMPLIMENTED()};
-// 	colour;
+// 		this._interpreter = interpreter;
+// 		interpreter.SyntaxTree.forEach(el=>{switch (el.type) {
+// 			case "PieceDefinition":{
+// 				this.PeiceTypes.push(el.name);
+// 				this._peiceDefinitions.push(el);
+// 			}break;
+// 			case "ColourDefinition":{
+// 				this.Colours.push(new CPDColour(this, el));
+// 				this._colourDefinitions.push(el);
+// 			}break;
+// 			default:{
+// 				throw "Execution Error: the roots of the syntax tree must be definition types";
+// 			}
+// 		}});
+// 	}
 // }
+// // class CPDMove{
+// // 	distance;
+// // 	from;
+// // 	to;
+// // }
+// // function UNIMPLIMENTED(){console.error("ERROR function "+arguments.callee.caller.name+" not defined");} 
+// // class CPDPeice{
+// // 	pos;
+// // 	board;
+// // 	colour;
+// // 	inCheck;
+// // 	moveCount;
+// // 	moveTo(pos){UNIMPLIMENTED()};
+// // 	lastmove;
+// // 	_peice;
+// // 	constructor(ctx, peice, colour){
+// // 		this._peice = peice;
+// // 		this.colour = colour;
+// // 	}
+// // }
+// // class CPDBoard{
+// // 	width;
+// // 	getPiece(pos){return this._board[pos];}
+// // 	isAttacked(pos){UNIMPLIMENTED()};
+// // 	removePiece(pos){this._board[pos]=null};
+// // 	setPiece(pos,peice,colour){this._board[pos]=new CPDPeice(peice,colour)};
+// // 	constructor(ctx, width){
+// // 		this.width = width;
+// // 		this._board = [...Array(width*width)];
+// // 	}
+// // 	_board = []
+// // }
+// // class CPDColour{
+// // 	constructor(ctx, el){
+// // 		this.colour = el.properties.find(p=>p.key==="name");
+// // 		if (this.colour === undefined){
+// // 			throw "Execution Error: colour is missing a name at "+ctx._interpreter.prettyPrintPos(el.pos);
+// // 		}
+
+// // 	};
+// // 	loose(){UNIMPLIMENTED()};
+// // 	direction;
+// // 	takePiece(pos){UNIMPLIMENTED()};
+// // 	openSelectPiece(peiceChoice){UNIMPLIMENTED()};
+// // 	colour;
+// // }

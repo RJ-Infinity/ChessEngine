@@ -294,8 +294,12 @@ enum Expresion{
 	BinarySubtraction(Data, Data, Range),
 	Multipication(Data, Data, Range),
 	Division(Data, Data, Range),
+	// boolean arithmetic
+	Negation(Data, Range),
+	Or(Data, Data, Range),
+	And(Data, Data, Range),
 }
-const OOO: [&str; 4]=["+","-","*","/"];
+const OOO: [&str; 6]=["+","-","*","/","||","&&"];
 macro_rules! next_ooo {($op: ident) => {OOO[OOO.iter().position(|o|o==&$op).expect("parse_ooo should always provide valid data")+1]};}
 impl Expresion{
 	fn get_binary_expr(op: &str, lhs:Data, rhs:Data)->Expresion{
@@ -306,6 +310,8 @@ impl Expresion{
 			"-"=>Expresion::BinarySubtraction,
 			"*"=>Expresion::Multipication,
 			"/"=>Expresion::Division,
+			"||"=>Expresion::Or,
+			"&&"=>Expresion::And,
 			_=>panic!("invalid op"), // this case should be handled by parse_ooo
 		}(lhs, rhs, Range{
 			start: lhs_range.start,
@@ -373,12 +379,13 @@ impl Expresion{
 		let mut unary_tokens = vec!();
 		while let Some(token) = token_gen.peek(){
 			// here the compiler needs to know it is a dyn
-			let t: (Box<dyn Fn(_, _) -> _>, _) = match token.content.as_str(){
-				"-"=>(Box::new(Expresion::UnarySubtraction), token.pos),
-				"+"=>(Box::new(Expresion::UnaryAddition), token.pos),
-				"+/-"=>(Box::new(Expresion::UnaryPlusMinus), token.pos),
+			let t: (Box<dyn Fn(_, _) -> _>, _) = (match token.content.as_str(){
+				"-"=>Box::new(Expresion::UnarySubtraction),
+				"+"=>Box::new(Expresion::UnaryAddition),
+				"+/-"=>Box::new(Expresion::UnaryPlusMinus),
+				"!"=>Box::new(Expresion::Negation),
 				_=>break
-			};
+			}, token.pos);
 			token_gen.next();
 			unary_tokens.push(t);
 		}
@@ -409,7 +416,10 @@ impl Ranged for Expresion{
 		Expresion::BinaryAddition(_, _, r) |
 		Expresion::BinarySubtraction(_, _, r) |
 		Expresion::Multipication(_, _, r) |
-		Expresion::Division(_, _, r) => r,
+		Expresion::Division(_, _, r) |
+		Expresion::Negation(_, r) |
+		Expresion::Or(_, _, r) |
+		Expresion::And(_, _, r) => r,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
 		&mut Expresion::UnaryAddition(_, ref mut r) |
@@ -418,7 +428,10 @@ impl Ranged for Expresion{
 		&mut Expresion::BinaryAddition(_, _, ref mut r) |
 		&mut Expresion::BinarySubtraction(_, _, ref mut r) |
 		&mut Expresion::Multipication(_, _, ref mut r) |
-		&mut Expresion::Division(_, _, ref mut r) => *r = setter(&r),
+		&mut Expresion::Division(_, _, ref mut r) |
+		&mut Expresion::Negation(_, ref mut r) |
+		&mut Expresion::Or(_, _, ref mut r) |
+		&mut Expresion::And(_, _, ref mut r) => *r = setter(&r),
 	}}
 }
 #[derive(Debug, PartialEq)]
@@ -450,6 +463,7 @@ enum Data{
 	Value(isize, Range),
 	Variable(Variable, Range),
 	Vector(Box<Vector>, Range),
+	Bool(bool, Range),
 }
 impl Data{
 	/// this can acctualy include an expr but only when it is contained within brackets
@@ -465,7 +479,15 @@ impl Data{
 
 		let Some(first_token) = token_gen.peek() else{return Err("expected data however reached the end of the file".into())};
 		let Some(first_char) = first_token.content.chars().next() else{panic!("lexer shouldnt emit empty tokens")};
-		if is_letter(&first_char){
+		if first_token.content == "true"{
+			let rv = Ok(Data::Bool(true, Range::from_token(first_token)));
+			token_gen.next();
+			return rv;
+		}else if first_token.content == "false"{
+			let rv = Ok(Data::Bool(false, Range::from_token(first_token)));
+			token_gen.next();
+			return rv;
+		}else if is_letter(&first_char){
 			let var = Variable::parse(token_gen)?;
 			let range = *var.get_range();
 			return Ok(Data::Variable(var,range));
@@ -504,13 +526,15 @@ impl Ranged for Data{
 		Data::Expresion(_, r) |
 		Data::Value(_, r) |
 		Data::Vector(_, r) |
-		Data::Variable(_, r) => r,
+		Data::Variable(_, r) |
+		Data::Bool(_, r) => r,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
 		&mut Data::Expresion(_, ref mut r) |
 		&mut Data::Value(_, ref mut r) |
 		&mut Data::Vector(_, ref mut r) |
-		&mut Data::Variable(_, ref mut r) => *r = setter(&r),
+		&mut Data::Variable(_, ref mut r) |
+		&mut Data::Bool(_, ref mut r) => *r = setter(&r),
 	}}
 }
 
