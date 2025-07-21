@@ -129,7 +129,9 @@ macro_rules! get_token_gen{($data: literal) =>{{
 	let mut int = Interpreter::new("<test>".to_string());
 	int.data = Some($data.to_string());
 	int.lexer().unwrap();
-	&mut peek_nth(int.tokens.unwrap().iter())
+	let tokens = Box::new(int.tokens.unwrap());
+	let tokens = Box::new(peek_nth(Box::leak(tokens).iter()));
+	Box::leak(tokens)
 }};}
 macro_rules! assert_parse {($parser: expr, $data: literal, $expected: expr) => {{
 	let mut int = Interpreter::new("<test>".to_string());

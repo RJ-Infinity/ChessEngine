@@ -1,11 +1,8 @@
-#![feature(let_chains)]
-#![feature(option_take_if)]
-#![feature(get_many_mut)]
 
 use std::ops::{Add, Sub};
 use itertools::{PeekNth, peek_nth};
 
-use wasm_bindgen::prelude::*;
+// use wasm_bindgen::prelude::*;
 
 #[cfg(test)]
 mod test;
@@ -19,7 +16,7 @@ fn is_letter(chr: &char)->bool{ ['a','b','c','d','e','f','g','h','i','j','k','l'
 fn is_all_valid_char(chr: &char)->bool{ is_expr_char(chr) || is_white_space_char(chr) || is_number(chr) || is_letter(chr) }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-#[wasm_bindgen]
+// #[wasm_bindgen]
 pub struct Pos{
 	pub line: usize,
 	pub chr: usize,
@@ -35,7 +32,7 @@ impl Sub<usize> for Pos{
 }
 
 #[derive(PartialEq, Clone, Copy, Debug)]
-#[wasm_bindgen]
+// #[wasm_bindgen]
 pub struct Range{
 	pub start: Pos,
 	pub end: Pos,
@@ -73,7 +70,7 @@ pub struct Token{
 	pub pos: Pos,
 }
 
-#[wasm_bindgen]
+// #[wasm_bindgen]
 #[derive(PartialEq, Clone, Debug)]
 pub struct UserMessage{
 	message: String,
@@ -252,8 +249,8 @@ impl Ranged for OuterDef{
 		OuterDef::Peice { range, .. } => range,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
-		OuterDef::Colour { ref mut range, .. } |
-		OuterDef::Peice { ref mut range, .. } => *range = setter(&range),
+		&mut OuterDef::Colour { ref mut range, .. } |
+		&mut OuterDef::Peice { ref mut range, .. } => *range = setter(&range),
 	}}
 }
 
@@ -415,13 +412,13 @@ impl Ranged for Expresion{
 		Expresion::Division(_, _, r) => r,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
-		Expresion::UnaryAddition(_, ref mut r) |
-		Expresion::UnarySubtraction(_, ref mut r) |
-		Expresion::UnaryPlusMinus(_, ref mut r) |
-		Expresion::BinaryAddition(_, _, ref mut r) |
-		Expresion::BinarySubtraction(_, _, ref mut r) |
-		Expresion::Multipication(_, _, ref mut r) |
-		Expresion::Division(_, _, ref mut r) => *r = setter(&r),
+		&mut Expresion::UnaryAddition(_, ref mut r) |
+		&mut Expresion::UnarySubtraction(_, ref mut r) |
+		&mut Expresion::UnaryPlusMinus(_, ref mut r) |
+		&mut Expresion::BinaryAddition(_, _, ref mut r) |
+		&mut Expresion::BinarySubtraction(_, _, ref mut r) |
+		&mut Expresion::Multipication(_, _, ref mut r) |
+		&mut Expresion::Division(_, _, ref mut r) => *r = setter(&r),
 	}}
 }
 #[derive(Debug, PartialEq)]
@@ -510,10 +507,10 @@ impl Ranged for Data{
 		Data::Variable(_, r) => r,
 	}}
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {match self{
-		Data::Expresion(_, ref mut r) |
-		Data::Value(_, ref mut r) |
-		Data::Vector(_, ref mut r) |
-		Data::Variable(_, ref mut r) => *r = setter(&r),
+		&mut Data::Expresion(_, ref mut r) |
+		&mut Data::Value(_, ref mut r) |
+		&mut Data::Vector(_, ref mut r) |
+		&mut Data::Variable(_, ref mut r) => *r = setter(&r),
 	}}
 }
 
@@ -568,30 +565,30 @@ impl Ranged for Vector{
 	fn set_range<T:FnOnce(&Range)->Range>(&mut self, setter: T) {self.range = setter(&self.range);}
 }
 
-#[wasm_bindgen]
+// #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Interpreter{
-	#[wasm_bindgen(skip)]
+	// #[wasm_bindgen(skip)]
 	pub data: Option<String>,
 	tokens: Option<Vec<Token>>,
 	syntax_tree: Option<RootExpr>,
-	#[wasm_bindgen(skip)]
+	// #[wasm_bindgen(skip)]
 	pub filename: String,
 }
 
-#[wasm_bindgen]
+// #[wasm_bindgen]
 impl Interpreter{
-	#[wasm_bindgen(getter = data)]
-	pub fn _data(&self) -> Option<String> {self.data.clone()}
-	#[wasm_bindgen(setter = data)]
-	pub fn _set_data(&mut self, data: Option<String>) {self.data = data;}
+	// #[wasm_bindgen(getter = data)]
+	// pub fn _data(&self) -> Option<String> {self.data.clone()}
+	// #[wasm_bindgen(setter = data)]
+	// pub fn _set_data(&mut self, data: Option<String>) {self.data = data;}
 
-	#[wasm_bindgen(getter = filename)]
-	pub fn _filename(&self) -> String {self.filename.clone()}
-	#[wasm_bindgen(setter = filename)]
-	pub fn _set_filename(&mut self, filename: String) {self.filename = filename;}
+	// #[wasm_bindgen(getter = filename)]
+	// pub fn _filename(&self) -> String {self.filename.clone()}
+	// #[wasm_bindgen(setter = filename)]
+	// pub fn _set_filename(&mut self, filename: String) {self.filename = filename;}
 
-	#[wasm_bindgen(constructor)]
+	// #[wasm_bindgen(constructor)]
 	///constructs a new Interpreter
 	pub fn new(filename: String)->Self{Interpreter{
 		data: None,
@@ -666,7 +663,7 @@ impl Interpreter{
 				if
 					chr == '-'
 					&& len >= 2
-					&& let Ok([plus, slash]) = tokens.get_many_mut([len-2, len-1])
+					&& let Ok([plus, slash]) = tokens.get_disjoint_mut([len-2, len-1])
 					&& plus == (&mut Token{
 						content: "+".to_string(),
 						pos: Pos::new(pos.line, pos.chr-2),
